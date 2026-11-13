@@ -1,0 +1,2057 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SciTrace · 文溯</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.js"></script>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #667069;
+      --line: #d9ded9;
+      --paper: #fbfcfa;
+      --canvas: #e7ebe7;
+      --teal: #0f766e;
+      --teal-soft: #dff3ef;
+      --amber: #b55d19;
+      --amber-soft: #fff1df;
+      --danger: #a23b32;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f3f5f2;
+      color: var(--ink);
+      font-family: Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .topbar {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(251, 252, 250, 0.96);
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand strong { font-size: 16px; letter-spacing: 0; }
+    .brand span { color: var(--muted); font-size: 12px; }
+
+    .service-state {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .service-state::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+    }
+
+    .service-state.ready::before { background: var(--teal); }
+
+    .app-nav {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #eef1ed;
+    }
+
+    .app-nav button {
+      min-width: 56px;
+      padding: 5px 12px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .app-nav button.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(23, 33, 27, .10);
+    }
+
+    .workspace {
+      height: calc(100vh - 56px);
+      display: grid;
+      grid-template-columns: 340px minmax(480px, 1fr) 300px;
+      overflow: hidden;
+    }
+
+    .graph-page {
+      height: calc(100vh - 56px);
+      display: grid;
+      grid-template-columns: minmax(620px, 1fr) 340px;
+      overflow: hidden;
+      background: #eef2ee;
+    }
+
+    .graph-stage {
+      position: relative;
+      min-width: 0;
+      border-right: 1px solid var(--line);
+      background: #f7f9f6;
+    }
+
+    #citationNetwork {
+      position: absolute;
+      inset: 0;
+    }
+
+    .graph-loading {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    .graph-side {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--paper);
+    }
+
+    .graph-side-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .graph-metric-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 7px;
+    }
+
+    .graph-metric {
+      padding: 9px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .graph-metric b { display: block; font-size: 20px; }
+    .graph-metric span { color: var(--muted); font-size: 10px; }
+
+    .graph-ranking {
+      display: grid;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .graph-rank-item {
+      padding: 8px;
+      border-left: 3px solid var(--teal);
+      background: #f6f9f7;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .graph-rank-item.edge {
+      border-left-color: var(--amber);
+      background: #fdf8f1;
+    }
+
+    .graph-rank-title { font-weight: 650; overflow-wrap: anywhere; }
+    .graph-rank-meta { margin-top: 3px; color: var(--muted); }
+
+    .pane {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--paper);
+    }
+
+    .pane + .pane { border-left: 1px solid var(--line); }
+    .pane.center { background: var(--canvas); }
+
+    .pane-head {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--paper);
+    }
+
+    .pane-head strong {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .pane-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .drop-zone {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 112px;
+      padding: 16px;
+      border: 1px dashed #aab5ad;
+      border-radius: 6px;
+      background: #f6f8f5;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color .15s, background .15s;
+    }
+
+    .drop-zone:hover, .drop-zone.dragging {
+      border-color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .drop-zone input { display: none; }
+
+    .drop-main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+    }
+
+    .drop-main svg { width: 24px; height: 24px; color: var(--teal); }
+    .drop-main small { color: var(--muted); font-size: 11px; }
+
+    .upload-status {
+      min-height: 20px;
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .upload-status.error { color: var(--danger); }
+    .upload-status.busy { color: var(--amber); }
+
+    .section {
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .section:first-of-type { border-top: 0; }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 9px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .paper-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.34;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .paper-subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .metric b {
+      display: block;
+      font-size: 18px;
+      line-height: 1.1;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .affiliation-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .affiliation-chip {
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--teal-soft);
+      color: #155e56;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .author-list {
+      display: grid;
+      gap: 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .author-row {
+      display: grid;
+      grid-template-columns: 19px minmax(0, 1fr);
+      gap: 7px;
+      padding: 7px 0;
+      border-bottom: 1px solid #edf0ec;
+    }
+
+    .author-index {
+      color: #8a938d;
+      font-size: 10px;
+      line-height: 1.55;
+      text-align: right;
+    }
+
+    .author-name {
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .author-line {
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .author-affiliation {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 2px;
+    }
+
+    .mini-item {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 7px;
+      padding: 5px 0;
+      border-bottom: 1px solid #edf0ec;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .mini-page {
+      color: var(--teal);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mini-title { overflow-wrap: anywhere; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+    }
+
+    .center-switch {
+      display: inline-flex;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #eef1ed;
+    }
+
+    .switch-btn {
+      min-width: 52px;
+      padding: 4px 10px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .switch-btn.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(23, 33, 27, .10);
+    }
+
+    .qa-mode-label {
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #bcc5be;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .icon-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .icon-btn:disabled { opacity: .4; cursor: default; }
+    .icon-btn svg { width: 17px; height: 17px; }
+
+    .page-number {
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      min-width: 76px;
+      text-align: center;
+    }
+
+    .pdf-scroll {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 22px 24px 48px;
+      scroll-behavior: smooth;
+    }
+
+    .qa-view {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--paper);
+    }
+
+    .qa-composer {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #f7f9f6;
+    }
+
+    .qa-label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .qa-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 8px;
+    }
+
+    #qaInput {
+      width: 100%;
+      min-height: 52px;
+      max-height: 120px;
+      resize: vertical;
+      padding: 9px 10px;
+      border: 1px solid #b9c3bb;
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      line-height: 1.45;
+      outline: none;
+    }
+
+    #qaInput:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 2px rgba(15, 118, 110, .12);
+    }
+
+    .qa-submit {
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 13px;
+      border: 1px solid var(--teal);
+      border-radius: 4px;
+      background: var(--teal);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .qa-submit:disabled { opacity: .55; cursor: wait; }
+    .qa-submit svg { width: 15px; height: 15px; }
+
+    .qa-results {
+      min-height: 0;
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      background: #fff;
+    }
+
+    .qa-empty {
+      padding: 32px 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    .qa-question {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .qa-question strong { color: var(--ink); }
+
+    .answer-layer {
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .answer-layer:first-of-type { border-top: 0; padding-top: 0; }
+
+    .layer-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: .05em;
+    }
+
+    .layer-label::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      background: var(--teal);
+    }
+
+    .wording-text {
+      margin: 0;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .evidence-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .evidence-item {
+      border: 1px solid #cdd7cf;
+      border-left: 3px solid var(--teal);
+      background: #fbfcfa;
+    }
+
+    .evidence-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 9px;
+      border-bottom: 1px solid #e5eae5;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .evidence-anchor {
+      border: 0;
+      padding: 2px 5px;
+      border-radius: 3px;
+      background: var(--teal-soft);
+      color: #0b5f58;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .evidence-anchor:hover { background: #c8ebe5; }
+
+    .evidence-bbox {
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .evidence-text,
+    .candidate-text {
+      margin: 0;
+      padding: 9px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #26332b;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .refusal {
+      padding: 10px 12px;
+      border-left: 3px solid var(--amber);
+      background: var(--amber-soft);
+      color: #7b3d12;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .candidate-list {
+      display: grid;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .candidate-item {
+      border: 1px solid var(--line);
+      background: #fafbf9;
+    }
+
+    .candidate-label {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .page-shell {
+      position: relative;
+      width: fit-content;
+      min-width: 240px;
+      min-height: 320px;
+      margin: 0 auto;
+      background: #fff;
+      box-shadow: 0 2px 16px rgba(25, 39, 31, .12);
+    }
+
+    #pdfCanvas { display: block; }
+
+    .bbox-highlight {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+      border: 2px solid #d97706;
+      background: rgba(245, 158, 11, .22);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, .10);
+    }
+
+    .pdf-empty {
+      display: grid;
+      place-items: center;
+      height: 100%;
+      padding: 30px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .chapter-scroll { padding: 8px; }
+    .chapter-tree { display: grid; gap: 1px; }
+
+    .chapter-item {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      align-items: start;
+      gap: 7px;
+      border: 0;
+      border-radius: 4px;
+      padding: 6px 7px;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .chapter-item:hover { background: #eef3ef; }
+    .chapter-item.active { background: var(--teal-soft); color: #0c5c55; }
+    .chapter-item.level-1 { margin-top: 5px; font-weight: 700; }
+    .chapter-item.level-2 { padding-left: 17px; font-weight: 600; }
+    .chapter-item.level-3 { padding-left: 28px; font-size: 11px; }
+
+    .chapter-page {
+      color: #7d8780;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1.45;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chapter-title {
+      font-size: inherit;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .empty-state {
+      padding: 24px 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(18, 28, 22, .48);
+    }
+
+    .modal-card {
+      width: min(720px, 100%);
+      max-height: min(86vh, 780px);
+      overflow: auto;
+      border: 1px solid #acb8af;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 18px 50px rgba(13, 24, 17, .28);
+    }
+
+    .modal-head {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .modal-close {
+      width: 30px;
+      height: 30px;
+      border: 0;
+      border-radius: 4px;
+      background: #eef1ed;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .modal-body { padding: 15px 16px; }
+
+    .duplicate-existing {
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .duplicate-existing strong { color: var(--ink); }
+
+    .signal-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border: 1px solid var(--line);
+    }
+
+    .signal-cell {
+      min-width: 0;
+      padding: 9px 8px;
+      border-left: 1px solid var(--line);
+    }
+
+    .signal-cell:first-child { border-left: 0; }
+    .signal-cell b { display: block; font-size: 14px; }
+    .signal-cell span { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+
+    .recommendation {
+      margin-top: 11px;
+      padding: 9px 11px;
+      border-left: 3px solid var(--amber);
+      background: var(--amber-soft);
+      color: #71380f;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      background: #fafbf9;
+    }
+
+    .modal-btn {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid #b8c2ba;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .modal-btn.primary {
+      border-color: var(--teal);
+      background: var(--teal);
+      color: #fff;
+    }
+
+    .modal-btn:disabled { opacity: .55; cursor: wait; }
+
+    .compare-section {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .compare-title {
+      margin: 0 0 10px;
+      font-size: 13px;
+    }
+
+    .compare-block {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: #fbfcfa;
+    }
+
+    .compare-block h4 {
+      margin: 0 0 7px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: .03em;
+    }
+
+    .diff-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .ref-summary {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .ref-list { margin: 8px 0 0; padding-left: 18px; font-size: 11px; line-height: 1.55; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 1100px) {
+      .workspace { grid-template-columns: 300px minmax(420px, 1fr) 260px; }
+      .pane-scroll { padding: 11px; }
+    }
+
+    @media (max-width: 860px) {
+      html, body { overflow: auto; }
+      .workspace {
+        height: auto;
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+      .pane { min-height: 420px; }
+      .pane + .pane { border-left: 0; border-top: 1px solid var(--line); }
+      .pane.center { min-height: 680px; }
+      .pane-scroll { max-height: 560px; }
+      .pdf-scroll { max-height: 620px; }
+      .graph-page {
+        height: auto;
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+      .graph-stage { min-height: 620px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .graph-side { min-height: 360px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>SciTrace · 文溯</strong>
+      <span>证据可追溯的科研阅读工作台</span>
+    </div>
+    <nav class="app-nav" aria-label="主导航">
+      <button class="active" id="readerNav" type="button">阅读</button>
+      <button id="graphNav" type="button">图谱</button>
+    </nav>
+    <div class="service-state" id="serviceState">正在连接本地服务</div>
+  </header>
+
+  <main class="workspace">
+    <aside class="pane">
+      <div class="pane-head">
+        <strong>论文与解析</strong>
+        <span id="documentCount">0 篇</span>
+      </div>
+      <div class="pane-scroll">
+        <label class="drop-zone" id="dropZone">
+          <input type="file" id="fileInput" accept="application/pdf,.pdf">
+          <span class="drop-main">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"></path>
+              <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"></path>
+            </svg>
+            <span>拖入 PDF 或点击选择</span>
+            <small>本地解析，不上传大模型</small>
+          </span>
+        </label>
+        <div class="upload-status" id="uploadStatus">等待选择文件</div>
+
+        <section class="section" id="paperSection">
+          <div class="section-title">当前论文</div>
+          <h1 class="paper-title" id="paperTitle">尚未载入论文</h1>
+          <div class="paper-subtitle" id="paperMeta">上传 PDF 后显示解析结果</div>
+          <div class="metric-grid">
+            <div class="metric"><b id="authorCount">0</b><span>作者</span></div>
+            <div class="metric"><b id="affiliationCount">0</b><span>机构</span></div>
+            <div class="metric"><b id="referenceCount">0</b><span>参考文献</span></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">
+            <span>作者与机构</span>
+          </div>
+          <div class="affiliation-chips" id="affiliationChips"></div>
+          <div class="author-list" id="authorList"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">
+            <span>标题树摘要</span>
+            <span id="headingCounts">一级 0 · 三级 0</span>
+          </div>
+          <div class="mini-list" id="topLevelList"></div>
+          <div class="section-title" style="margin-top:14px">三级标题</div>
+          <div class="mini-list" id="thirdLevelList"></div>
+        </section>
+      </div>
+    </aside>
+
+    <section class="pane center">
+      <div class="pane-head">
+        <div class="center-switch" role="tablist" aria-label="中间视图">
+          <button class="switch-btn active" id="readerTab" type="button" role="tab" aria-selected="true">原文</button>
+          <button class="switch-btn" id="qaTab" type="button" role="tab" aria-selected="false">问答</button>
+        </div>
+        <div class="toolbar" id="pageToolbar">
+          <button class="icon-btn" id="prevPage" type="button" aria-label="上一页" title="上一页">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </button>
+          <span class="page-number" id="pageNumber">— / —</span>
+          <button class="icon-btn" id="nextPage" type="button" aria-label="下一页" title="下一页">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="m9 18 6-6-6-6"></path>
+            </svg>
+          </button>
+        </div>
+        <span class="qa-mode-label hidden" id="qaModeLabel">证据可溯源</span>
+      </div>
+
+      <div class="qa-view hidden" id="qaView">
+        <form class="qa-composer" id="qaForm">
+          <label class="qa-label" for="qaInput">问题</label>
+          <div class="qa-input-row">
+            <textarea id="qaInput" rows="2" placeholder="输入针对当前论文的问题"></textarea>
+            <button class="qa-submit" id="qaSubmit" type="submit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="m22 2-7 20-4-9-9-4Z"></path>
+                <path d="M22 2 11 13"></path>
+              </svg>
+              检索
+            </button>
+          </div>
+        </form>
+        <div class="qa-results" id="qaResults" aria-live="polite">
+          <div class="qa-empty">输入问题后，先检索证据，再生成措辞。</div>
+        </div>
+      </div>
+
+      <div class="pdf-scroll" id="pdfScroll">
+        <div class="pdf-empty" id="pdfEmpty">PDF 阅读器准备中</div>
+        <div class="page-shell hidden" id="pageShell">
+          <canvas id="pdfCanvas"></canvas>
+          <div class="bbox-highlight" id="bboxHighlight"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="pane">
+      <div class="pane-head">
+        <strong>章节树</strong>
+        <span>点击定位原文</span>
+      </div>
+      <div class="pane-scroll chapter-scroll">
+        <div class="chapter-tree" id="chapterTree">
+          <div class="empty-state">载入论文后显示章节</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="graph-page hidden" id="graphPage">
+    <div class="graph-stage">
+      <div id="citationNetwork"></div>
+      <div class="graph-loading" id="graphLoading">正在构建引用图谱</div>
+    </div>
+    <aside class="graph-side">
+      <div class="pane-head">
+        <strong>局部引用图谱</strong>
+        <button class="modal-btn" id="refreshGraph" type="button">刷新</button>
+      </div>
+      <div class="graph-side-scroll">
+        <div class="graph-metric-row">
+          <div class="graph-metric"><b id="graphNodeCount">—</b><span>节点数</span></div>
+          <div class="graph-metric"><b id="graphEdgeCount">—</b><span>引用边数</span></div>
+        </div>
+        <section class="section">
+          <div class="section-title">基石论文 Top 2</div>
+          <div class="graph-ranking" id="seminalRanking"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">边缘论文后 3</div>
+          <div class="graph-ranking" id="edgeRanking"></div>
+        </section>
+      </div>
+    </aside>
+  </section>
+
+  <div class="modal-backdrop hidden" id="duplicateModal">
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="duplicateTitle">
+      <div class="modal-head">
+        <h2 id="duplicateTitle">检测到同源版本</h2>
+        <button class="modal-close" id="duplicateClose" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="duplicate-existing" id="duplicateExisting"></div>
+        <div class="signal-grid">
+          <div class="signal-cell"><b id="dupSimhash">—</b><span>SimHash</span></div>
+          <div class="signal-cell"><b id="dupMinhash">—</b><span>MinHash</span></div>
+          <div class="signal-cell"><b id="dupTitle">—</b><span>标题相似度</span></div>
+          <div class="signal-cell"><b id="dupScore">—</b><span>综合分</span></div>
+          <div class="signal-cell"><b id="dupThreshold">—</b><span>阈值</span></div>
+        </div>
+        <div class="recommendation" id="duplicateRecommendation"></div>
+
+        <section class="compare-section hidden" id="compareSection">
+          <h3 class="compare-title">版本差异</h3>
+          <div class="compare-block">
+            <h4>章节级变化</h4>
+            <div class="diff-list" id="chapterDiff"></div>
+          </div>
+          <div class="compare-block">
+            <h4>参考文献条目级变化</h4>
+            <div class="ref-summary" id="referenceSummary"></div>
+            <ul class="ref-list" id="referenceDiff"></ul>
+          </div>
+        </section>
+      </div>
+      <div class="modal-actions" id="duplicateActions">
+        <button class="modal-btn" id="overwriteBtn" type="button">覆盖库内</button>
+        <button class="modal-btn" id="keepBtn" type="button">保留库内</button>
+        <button class="modal-btn primary" id="compareBtn" type="button">对比两个版本</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      paper: null,
+      pdfDoc: null,
+      currentPage: 1,
+      pageCount: 0,
+      scale: 1,
+      renderToken: 0,
+      activeIndex: -1,
+      pendingOutlineIndex: null,
+      pendingEvidence: null,
+      lastBBox: null,
+      loadingPdf: false,
+      qaResult: null,
+      centerView: "reader",
+      duplicateContext: null,
+      graphNetwork: null,
+      graphLoaded: false,
+    };
+
+    const el = {
+      serviceState: document.getElementById("serviceState"),
+      documentCount: document.getElementById("documentCount"),
+      dropZone: document.getElementById("dropZone"),
+      fileInput: document.getElementById("fileInput"),
+      uploadStatus: document.getElementById("uploadStatus"),
+      paperTitle: document.getElementById("paperTitle"),
+      paperMeta: document.getElementById("paperMeta"),
+      authorCount: document.getElementById("authorCount"),
+      affiliationCount: document.getElementById("affiliationCount"),
+      referenceCount: document.getElementById("referenceCount"),
+      authorList: document.getElementById("authorList"),
+      affiliationChips: document.getElementById("affiliationChips"),
+      headingCounts: document.getElementById("headingCounts"),
+      topLevelList: document.getElementById("topLevelList"),
+      thirdLevelList: document.getElementById("thirdLevelList"),
+      pdfScroll: document.getElementById("pdfScroll"),
+      pdfEmpty: document.getElementById("pdfEmpty"),
+      pageShell: document.getElementById("pageShell"),
+      pdfCanvas: document.getElementById("pdfCanvas"),
+      bboxHighlight: document.getElementById("bboxHighlight"),
+      pageNumber: document.getElementById("pageNumber"),
+      prevPage: document.getElementById("prevPage"),
+      nextPage: document.getElementById("nextPage"),
+      chapterTree: document.getElementById("chapterTree"),
+      readerTab: document.getElementById("readerTab"),
+      qaTab: document.getElementById("qaTab"),
+      pageToolbar: document.getElementById("pageToolbar"),
+      qaModeLabel: document.getElementById("qaModeLabel"),
+      qaView: document.getElementById("qaView"),
+      qaForm: document.getElementById("qaForm"),
+      qaInput: document.getElementById("qaInput"),
+      qaSubmit: document.getElementById("qaSubmit"),
+      qaResults: document.getElementById("qaResults"),
+      workspace: document.querySelector(".workspace"),
+      readerNav: document.getElementById("readerNav"),
+      graphNav: document.getElementById("graphNav"),
+      graphPage: document.getElementById("graphPage"),
+      citationNetwork: document.getElementById("citationNetwork"),
+      graphLoading: document.getElementById("graphLoading"),
+      graphNodeCount: document.getElementById("graphNodeCount"),
+      graphEdgeCount: document.getElementById("graphEdgeCount"),
+      seminalRanking: document.getElementById("seminalRanking"),
+      edgeRanking: document.getElementById("edgeRanking"),
+      refreshGraph: document.getElementById("refreshGraph"),
+      duplicateModal: document.getElementById("duplicateModal"),
+      duplicateTitle: document.getElementById("duplicateTitle"),
+      duplicateClose: document.getElementById("duplicateClose"),
+      duplicateExisting: document.getElementById("duplicateExisting"),
+      dupSimhash: document.getElementById("dupSimhash"),
+      dupMinhash: document.getElementById("dupMinhash"),
+      dupTitle: document.getElementById("dupTitle"),
+      dupScore: document.getElementById("dupScore"),
+      dupThreshold: document.getElementById("dupThreshold"),
+      duplicateRecommendation: document.getElementById("duplicateRecommendation"),
+      duplicateActions: document.getElementById("duplicateActions"),
+      overwriteBtn: document.getElementById("overwriteBtn"),
+      keepBtn: document.getElementById("keepBtn"),
+      compareBtn: document.getElementById("compareBtn"),
+      compareSection: document.getElementById("compareSection"),
+      chapterDiff: document.getElementById("chapterDiff"),
+      referenceSummary: document.getElementById("referenceSummary"),
+      referenceDiff: document.getElementById("referenceDiff"),
+    };
+
+    function setServiceReady(text) {
+      el.serviceState.textContent = text;
+      el.serviceState.classList.add("ready");
+    }
+
+    function setUploadStatus(text, kind = "") {
+      el.uploadStatus.textContent = text;
+      el.uploadStatus.className = `upload-status ${kind}`.trim();
+    }
+
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        let message = `${response.status} ${response.statusText}`;
+        try {
+          const body = await response.json();
+          message = body.detail || message;
+        } catch (_) {}
+        throw new Error(message);
+      }
+      return response.json();
+    }
+
+    function setCenterView(view) {
+      state.centerView = view === "qa" ? "qa" : "reader";
+      const qaActive = state.centerView === "qa";
+      el.qaView.classList.toggle("hidden", !qaActive);
+      el.pdfScroll.classList.toggle("hidden", qaActive);
+      el.pageToolbar.classList.toggle("hidden", qaActive);
+      el.qaModeLabel.classList.toggle("hidden", !qaActive);
+      el.readerTab.classList.toggle("active", !qaActive);
+      el.qaTab.classList.toggle("active", qaActive);
+      el.readerTab.setAttribute("aria-selected", String(!qaActive));
+      el.qaTab.setAttribute("aria-selected", String(qaActive));
+    }
+
+    function layerTitle(text) {
+      return createTextElement("div", "layer-label", text);
+    }
+
+    function renderQaEmpty(text) {
+      el.qaResults.replaceChildren(createTextElement("div", "qa-empty", text));
+    }
+
+    function renderQaResult(result) {
+      state.qaResult = result;
+      el.qaResults.replaceChildren();
+
+      const question = document.createElement("div");
+      question.className = "qa-question";
+      question.appendChild(document.createTextNode("问题："));
+      question.appendChild(createTextElement("strong", "", result.question || ""));
+      el.qaResults.appendChild(question);
+
+      const wordingLayer = document.createElement("section");
+      wordingLayer.className = "answer-layer";
+      wordingLayer.appendChild(layerTitle("措辞层"));
+      wordingLayer.appendChild(
+        createTextElement("p", "wording-text", result.wording || "未配置模型，仅展示证据")
+      );
+      el.qaResults.appendChild(wordingLayer);
+
+      const evidenceLayer = document.createElement("section");
+      evidenceLayer.className = "answer-layer";
+      evidenceLayer.appendChild(layerTitle("证据层"));
+
+      if (result.refusal) {
+        evidenceLayer.appendChild(createTextElement("div", "refusal", "文献中未提及"));
+        const candidates = result.candidates || [];
+        if (candidates.length) {
+          const list = document.createElement("div");
+          list.className = "candidate-list";
+          candidates.forEach((candidate, index) => {
+            const item = document.createElement("div");
+            item.className = "candidate-item";
+            item.appendChild(
+              createTextElement(
+                "div",
+                "candidate-label",
+                `候选 ${index + 1} · 第 ${candidate.page} 页`
+              )
+            );
+            item.appendChild(createTextElement("pre", "candidate-text", candidate.text));
+            list.appendChild(item);
+          });
+          evidenceLayer.appendChild(list);
+        } else {
+          evidenceLayer.appendChild(createTextElement("div", "qa-empty", "没有候选片段"));
+        }
+      } else {
+        const list = document.createElement("div");
+        list.className = "evidence-list";
+        (result.evidence || []).forEach((evidence, index) => {
+          const item = document.createElement("div");
+          item.className = "evidence-item";
+          const head = document.createElement("div");
+          head.className = "evidence-head";
+          const anchor = createTextElement("button", "evidence-anchor", `[${evidence.tag}]`);
+          anchor.type = "button";
+          anchor.title = `跳到第 ${evidence.page} 页`;
+          anchor.addEventListener("click", () => jumpToEvidence(index));
+          head.appendChild(anchor);
+          head.appendChild(createTextElement("span", "", `第 ${evidence.page} 页`));
+          head.appendChild(
+            createTextElement(
+              "span",
+              "evidence-bbox",
+              `bbox ${JSON.stringify(evidence.bbox)}`
+            )
+          );
+          item.appendChild(head);
+          item.appendChild(createTextElement("pre", "evidence-text", evidence.text));
+          list.appendChild(item);
+        });
+        evidenceLayer.appendChild(list);
+      }
+      el.qaResults.appendChild(evidenceLayer);
+    }
+
+    async function submitQuestion(event) {
+      event.preventDefault();
+      const question = el.qaInput.value.trim();
+      if (!question) return;
+      if (!state.paper?.paper_id) {
+        renderQaEmpty("请先载入论文");
+        return;
+      }
+      setCenterView("qa");
+      el.qaSubmit.disabled = true;
+      renderQaEmpty("正在检索证据");
+      try {
+        const result = await fetchJson("/api/qa/evidence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, paper_id: state.paper.paper_id }),
+        });
+        renderQaResult(result);
+      } catch (error) {
+        renderQaEmpty(`检索失败：${error.message}`);
+      } finally {
+        el.qaSubmit.disabled = false;
+      }
+    }
+
+    async function jumpToEvidence(index) {
+      const evidence = state.qaResult?.evidence?.[index];
+      if (!evidence) return;
+      setCenterView("reader");
+      state.lastBBox = evidence.bbox;
+      state.pendingEvidence = evidence;
+      if (!state.pdfDoc) {
+        setUploadStatus("PDF 加载中，完成后将自动跳到证据位置", "busy");
+        return;
+      }
+      state.pendingEvidence = null;
+      await renderPage(evidence.page, evidence.bbox);
+    }
+
+    function bindQa() {
+      el.readerTab.addEventListener("click", () => setCenterView("reader"));
+      el.qaTab.addEventListener("click", () => setCenterView("qa"));
+      el.qaForm.addEventListener("submit", submitQuestion);
+    }
+
+    function setMainView(view) {
+      const graphActive = view === "graph";
+      el.workspace.classList.toggle("hidden", graphActive);
+      el.graphPage.classList.toggle("hidden", !graphActive);
+      el.readerNav.classList.toggle("active", !graphActive);
+      el.graphNav.classList.toggle("active", graphActive);
+      if (graphActive) {
+        loadGraph();
+      }
+    }
+
+    function shortLabel(label) {
+      const text = String(label || "");
+      return text.length > 34 ? `${text.slice(0, 32)}…` : text;
+    }
+
+    function appendGraphRank(container, node, index, edge = false) {
+      const item = document.createElement("div");
+      item.className = `graph-rank-item${edge ? " edge" : ""}`;
+      item.appendChild(
+        createTextElement("div", "graph-rank-title", `${index + 1}. ${node.label}`)
+      );
+      item.appendChild(
+        createTextElement(
+          "div",
+          "graph-rank-meta",
+          `被引 ${node.in_degree} · PageRank ${Number(node.pagerank).toFixed(6)}`
+        )
+      );
+      container.appendChild(item);
+    }
+
+    function renderGraphStats(data) {
+      el.graphNodeCount.textContent = String(data.stats?.n_nodes ?? data.nodes.length);
+      el.graphEdgeCount.textContent = String(data.stats?.n_edges ?? data.edges.length);
+      el.seminalRanking.replaceChildren();
+      el.edgeRanking.replaceChildren();
+      (data.stats?.top_seminal || []).slice(0, 2).forEach((node, index) => {
+        appendGraphRank(el.seminalRanking, node, index);
+      });
+      (data.stats?.edge_papers || []).slice(0, 3).forEach((node, index) => {
+        appendGraphRank(el.edgeRanking, node, index, true);
+      });
+      if (!el.seminalRanking.children.length) {
+        el.seminalRanking.appendChild(createTextElement("div", "empty-state", "暂无基石节点"));
+      }
+      if (!el.edgeRanking.children.length) {
+        el.edgeRanking.appendChild(createTextElement("div", "empty-state", "暂无边缘节点"));
+      }
+    }
+
+    async function openGraphPaper(paperId) {
+      try {
+        setUploadStatus("正在打开图谱节点对应论文", "busy");
+        const paper = await fetchJson(`/api/papers/${encodeURIComponent(paperId)}/parse`);
+        applyPaper(paper);
+        setMainView("reader");
+        await loadPdf(paper.pdf_url);
+        setUploadStatus(`已打开 ${paper.filename}`, "ready");
+      } catch (error) {
+        setUploadStatus(`打开论文失败：${error.message}`, "error");
+      }
+    }
+
+    async function loadGraph(force = false) {
+      if (state.graphLoaded && !force) return;
+      el.graphLoading.style.display = "grid";
+      el.graphLoading.textContent = "正在构建引用图谱";
+      try {
+        if (!window.vis) throw new Error("vis-network CDN 未加载");
+        const data = await fetchJson("/api/graph", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paper_ids: [] }),
+        });
+        const roleColors = {
+          seminal: { background: "#0f766e", border: "#075c55", font: "#ffffff" },
+          edge: { background: "#f2c27b", border: "#b55d19", font: "#40240c" },
+          frontier: { background: "#dbe7df", border: "#6b8e7b", font: "#17211b" },
+          isolated: { background: "#f0f1ee", border: "#a7afa9", font: "#4c5750" },
+          external: { background: "#eceff1", border: "#8b969d", font: "#4c5750" },
+        };
+        const nodes = new vis.DataSet(
+          data.nodes.map((node) => {
+            const color = roleColors[node.role] || roleColors.frontier;
+            return {
+              id: node.id,
+              label: shortLabel(node.label),
+              title: `${node.label}\n${node.year || "年份未知"}\n被引 ${node.in_degree} · PageRank ${Number(node.pagerank).toFixed(6)}`,
+              kind: node.kind,
+              value: Math.max(1, Number(node.in_degree) + 1),
+              shape: "dot",
+              size: 12 + Math.min(22, Number(node.in_degree) * 2),
+              color: {
+                background: color.background,
+                border: color.border,
+                highlight: { background: "#d97706", border: "#92400e" },
+              },
+              font: { color: color.font, size: node.role === "seminal" ? 14 : 11, face: "Inter, sans-serif" },
+            };
+          })
+        );
+        const edges = new vis.DataSet(
+          data.edges.map((edge, index) => ({
+            id: index,
+            from: edge.source,
+            to: edge.target,
+            arrows: { to: { enabled: true, scaleFactor: 0.55 } },
+            color: { color: "#87958c", highlight: "#0f766e", opacity: 0.66 },
+            width: 1,
+          }))
+        );
+        if (state.graphNetwork) state.graphNetwork.destroy();
+        state.graphNetwork = new vis.Network(
+          el.citationNetwork,
+          { nodes, edges },
+          {
+            autoResize: true,
+            interaction: { hover: true, tooltipDelay: 120 },
+            physics: {
+              solver: "forceAtlas2Based",
+              forceAtlas2Based: {
+                gravitationalConstant: -48,
+                centralGravity: 0.008,
+                springLength: 145,
+                springConstant: 0.075,
+                damping: 0.62,
+              },
+              stabilization: { iterations: 220 },
+            },
+            edges: { smooth: { type: "continuous" } },
+          }
+        );
+        state.graphNetwork.on("click", (params) => {
+          if (!params.nodes.length) return;
+          const selected = nodes.get(params.nodes[0]);
+          if (selected?.kind === "library") {
+            openGraphPaper(selected.id);
+          }
+        });
+        renderGraphStats(data);
+        el.graphLoading.style.display = "none";
+        state.graphLoaded = true;
+      } catch (error) {
+        el.graphLoading.textContent = `图谱加载失败：${error.message}`;
+      }
+    }
+
+    function bindGraph() {
+      el.readerNav.addEventListener("click", () => setMainView("reader"));
+      el.graphNav.addEventListener("click", () => setMainView("graph"));
+      el.refreshGraph.addEventListener("click", () => loadGraph(true));
+    }
+
+    function collectAffiliations(authors) {
+      const seen = new Set();
+      const result = [];
+      for (const author of authors || []) {
+        const affiliation = author.affiliation
+          || (Array.isArray(author.affiliations) ? author.affiliations.join(" · ") : "");
+        if (affiliation && !seen.has(affiliation)) {
+          seen.add(affiliation);
+          result.push(affiliation);
+        }
+      }
+      return result;
+    }
+
+    function createTextElement(tag, className, text) {
+      const node = document.createElement(tag);
+      node.className = className;
+      node.textContent = text;
+      return node;
+    }
+
+    function renderAuthors(paper) {
+      const authors = paper.authors || [];
+      const affiliations = (paper.affiliations && paper.affiliations.length)
+        ? paper.affiliations
+        : collectAffiliations(authors);
+      el.authorCount.textContent = String(authors.length);
+      el.affiliationCount.textContent = String(affiliations.length);
+      el.referenceCount.textContent = String(paper.n_references || 0);
+
+      el.affiliationChips.replaceChildren();
+      for (const affiliation of affiliations) {
+        el.affiliationChips.appendChild(createTextElement("span", "affiliation-chip", affiliation));
+      }
+      if (!affiliations.length) {
+        el.affiliationChips.appendChild(createTextElement("span", "affiliation-chip", "机构未提取"));
+      }
+
+      el.authorList.replaceChildren();
+      authors.forEach((author, index) => {
+        const row = document.createElement("div");
+        row.className = "author-row";
+        row.appendChild(createTextElement("span", "author-index", String(index + 1)));
+        const text = document.createElement("div");
+        const affiliation = author.affiliation
+          || (Array.isArray(author.affiliations) ? author.affiliations.join(" · ") : "")
+          || "机构未提取";
+        text.appendChild(
+          createTextElement("div", "author-line", `${author.name || "未命名作者"} — ${affiliation}`)
+        );
+        row.appendChild(text);
+        el.authorList.appendChild(row);
+      });
+      if (!authors.length) {
+        el.authorList.appendChild(createTextElement("div", "empty-state", "作者区未提取"));
+      }
+    }
+
+    function makeMiniItem(item) {
+      const row = document.createElement("div");
+      row.className = "mini-item";
+      row.appendChild(createTextElement("span", "mini-page", `p.${item.page}`));
+      row.appendChild(createTextElement("span", "mini-title", item.title));
+      return row;
+    }
+
+    function renderOutline(paper) {
+      const outline = paper.outline || [];
+      const level1 = outline.filter((item) => item.level === 1);
+      const level3 = outline.filter((item) => item.level === 3);
+      el.headingCounts.textContent = `一级 ${level1.length} · 三级 ${level3.length}`;
+
+      el.topLevelList.replaceChildren(...level1.map(makeMiniItem));
+      el.thirdLevelList.replaceChildren(...level3.map(makeMiniItem));
+      if (!level1.length) {
+        el.topLevelList.appendChild(createTextElement("div", "empty-state", "未识别一级标题"));
+      }
+      if (!level3.length) {
+        el.thirdLevelList.appendChild(createTextElement("div", "empty-state", "未识别三级标题"));
+      }
+    }
+
+    function renderChapterTree(paper) {
+      const outline = paper.outline || [];
+      el.chapterTree.replaceChildren();
+      outline.forEach((item, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `chapter-item level-${item.level}`;
+        button.dataset.index = String(index);
+        button.appendChild(createTextElement("span", "chapter-page", `p.${item.page}`));
+        button.appendChild(createTextElement("span", "chapter-title", item.title));
+        button.addEventListener("click", () => jumpToOutline(index));
+        el.chapterTree.appendChild(button);
+      });
+      if (!outline.length) {
+        el.chapterTree.appendChild(createTextElement("div", "empty-state", "未识别章节树"));
+      }
+    }
+
+    function applyPaper(paper) {
+      state.paper = paper;
+      state.activeIndex = -1;
+      state.pendingOutlineIndex = null;
+      state.pendingEvidence = null;
+      state.lastBBox = null;
+      state.qaResult = null;
+      renderQaEmpty("输入问题后，先检索证据，再生成措辞。");
+      setCenterView("reader");
+      document.title = `${paper.title || "论文"} · SciTrace`;
+      el.paperTitle.textContent = paper.title || paper.filename || "未命名论文";
+      el.paperMeta.textContent = `${paper.n_pages || 0} 页 · ${paper.year || "年份未知"} · ${paper.filename || ""}`;
+      renderAuthors(paper);
+      renderOutline(paper);
+      renderChapterTree(paper);
+    }
+
+    function setActiveChapter(index) {
+      state.activeIndex = index;
+      for (const button of el.chapterTree.querySelectorAll(".chapter-item")) {
+        button.classList.toggle("active", Number(button.dataset.index) === index);
+      }
+    }
+
+    async function jumpToOutline(index) {
+      const item = state.paper?.outline?.[index];
+      if (!item) return;
+      setActiveChapter(index);
+      state.lastBBox = item.bbox || null;
+      if (!state.pdfDoc) {
+        state.pendingOutlineIndex = index;
+        setUploadStatus("PDF 加载中，完成后将自动跳到所选章节", "busy");
+        return;
+      }
+      try {
+        await renderPage(item.page, item.bbox || null);
+      } catch (error) {
+        setUploadStatus(`章节定位失败：${error.message}`, "error");
+      }
+    }
+
+    function showPdfError(message) {
+      el.pageShell.classList.add("hidden");
+      el.pdfEmpty.classList.remove("hidden");
+      el.pdfEmpty.textContent = message;
+    }
+
+    async function loadPdf(url) {
+      state.loadingPdf = true;
+      state.pdfDoc = null;
+      state.currentPage = 1;
+      state.pageCount = 0;
+      el.pageNumber.textContent = "— / —";
+      el.prevPage.disabled = true;
+      el.nextPage.disabled = true;
+      el.pageShell.classList.add("hidden");
+      el.pdfEmpty.classList.remove("hidden");
+      el.pdfEmpty.textContent = "正在加载 PDF";
+      try {
+        if (!window.pdfjsLib) throw new Error("PDF.js CDN 未加载");
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        state.pdfDoc = await window.pdfjsLib.getDocument(url).promise;
+        state.pageCount = state.pdfDoc.numPages;
+        el.nextPage.disabled = false;
+        await renderPage(1, null);
+        if (state.pendingOutlineIndex !== null) {
+          const pending = state.pendingOutlineIndex;
+          state.pendingOutlineIndex = null;
+          await jumpToOutline(pending);
+        }
+        if (state.pendingEvidence) {
+          const pending = state.pendingEvidence;
+          state.pendingEvidence = null;
+          await renderPage(pending.page, pending.bbox);
+        }
+      } catch (error) {
+        showPdfError(`PDF 加载失败：${error.message}`);
+      } finally {
+        state.loadingPdf = false;
+      }
+    }
+
+    async function renderPage(pageNumber, bbox = null) {
+      if (!state.pdfDoc) return;
+      const safePage = Math.min(Math.max(1, Number(pageNumber) || 1), state.pageCount);
+      const token = ++state.renderToken;
+      const page = await state.pdfDoc.getPage(safePage);
+      if (token !== state.renderToken) return;
+
+      const base = page.getViewport({ scale: 1 });
+      const available = Math.max(300, el.pdfScroll.clientWidth - 48);
+      const scale = Math.min(1.8, Math.max(0.55, available / base.width));
+      const viewport = page.getViewport({ scale });
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const context = el.pdfCanvas.getContext("2d", { alpha: false });
+
+      el.pdfCanvas.width = Math.floor(viewport.width * dpr);
+      el.pdfCanvas.height = Math.floor(viewport.height * dpr);
+      el.pdfCanvas.style.width = `${viewport.width}px`;
+      el.pdfCanvas.style.height = `${viewport.height}px`;
+      el.pageShell.style.width = `${viewport.width}px`;
+      el.pageShell.style.height = `${viewport.height}px`;
+
+      const transform = dpr === 1 ? null : [dpr, 0, 0, dpr, 0, 0];
+      await page.render({ canvasContext: context, viewport, transform }).promise;
+      if (token !== state.renderToken) return;
+
+      state.currentPage = safePage;
+      state.scale = scale;
+      el.pdfEmpty.classList.add("hidden");
+      el.pageShell.classList.remove("hidden");
+      el.pageNumber.textContent = `${safePage} / ${state.pageCount}`;
+      el.prevPage.disabled = safePage <= 1;
+      el.nextPage.disabled = safePage >= state.pageCount;
+      drawHighlight(bbox);
+      if (bbox) {
+        const targetTop = el.pageShell.offsetTop + Number(bbox[1]) * scale - 36;
+        el.pdfScroll.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      } else {
+        el.pdfScroll.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+
+    function drawHighlight(bbox) {
+      if (!bbox || bbox.length !== 4) {
+        el.bboxHighlight.style.display = "none";
+        return;
+      }
+      const [x0, y0, x1, y1] = bbox.map(Number);
+      el.bboxHighlight.style.display = "block";
+      el.bboxHighlight.style.left = `${x0 * state.scale}px`;
+      el.bboxHighlight.style.top = `${y0 * state.scale}px`;
+      el.bboxHighlight.style.width = `${Math.max(4, (x1 - x0) * state.scale)}px`;
+      el.bboxHighlight.style.height = `${Math.max(4, (y1 - y0) * state.scale)}px`;
+    }
+
+    function duplicateScore(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number.toFixed(4) : "—";
+    }
+
+    function closeDuplicateModal() {
+      el.duplicateModal.classList.add("hidden");
+      state.duplicateContext = null;
+    }
+
+    function openDuplicateModal(file, result) {
+      const duplicate = result.duplicates?.[0];
+      if (!duplicate) return;
+      state.duplicateContext = { file, result, duplicate };
+      el.duplicateTitle.textContent = "检测到同源版本";
+      el.duplicateExisting.replaceChildren();
+      el.duplicateExisting.appendChild(document.createTextNode("库内已有："));
+      el.duplicateExisting.appendChild(
+        createTextElement("strong", "", duplicate.existing_filename || duplicate.existing_title || "未知文献")
+      );
+      el.duplicateExisting.appendChild(
+        document.createTextNode(` · ${duplicate.existing_year || "年份未知"}`)
+      );
+      el.dupSimhash.textContent = duplicateScore(duplicate.simhash_similarity);
+      el.dupMinhash.textContent = duplicateScore(duplicate.minhash_similarity);
+      el.dupTitle.textContent = duplicateScore(duplicate.title_similarity);
+      el.dupScore.textContent = duplicateScore(duplicate.similarity ?? result.similarity);
+      el.dupThreshold.textContent = duplicateScore(duplicate.threshold);
+      el.duplicateRecommendation.textContent =
+        result.recommendation || "建议对比版本差异后再决定保留版本";
+      el.compareSection.classList.add("hidden");
+      el.duplicateActions.classList.remove("hidden");
+      Array.from(el.duplicateActions.querySelectorAll("button")).forEach((button) => {
+        button.disabled = false;
+      });
+      el.duplicateModal.classList.remove("hidden");
+    }
+
+    async function postUpload(file, allowDuplicate = false) {
+      const form = new FormData();
+      form.append("files", file);
+      const suffix = allowDuplicate ? "?allow_duplicate=true" : "";
+      const payload = await fetchJson(`/api/papers/upload${suffix}`, {
+        method: "POST",
+        body: form,
+      });
+      return payload.results?.[0];
+    }
+
+    async function loadUploadedResult(result) {
+      const paper = await fetchJson(`/api/papers/${encodeURIComponent(result.paper_id)}/parse`);
+      applyPaper(paper);
+      await loadPdf(paper.pdf_url);
+    }
+
+    async function refreshDocumentCount() {
+      const payload = await fetchJson("/api/papers");
+      el.documentCount.textContent = `${(payload.papers || []).length} 篇`;
+      state.graphLoaded = false;
+    }
+
+    function setDuplicateBusy(busy) {
+      for (const button of [el.overwriteBtn, el.keepBtn, el.compareBtn]) {
+        button.disabled = busy;
+      }
+    }
+
+    async function overwriteLibrary() {
+      const context = state.duplicateContext;
+      if (!context) return;
+      setDuplicateBusy(true);
+      setUploadStatus("正在覆盖库内版本", "busy");
+      try {
+        const result = await postUpload(context.file, true);
+        if (result?.status !== "ok") {
+          throw new Error(result?.reason || result?.message || "覆盖失败");
+        }
+        await loadUploadedResult(result);
+        await fetchJson(`/api/papers/${encodeURIComponent(context.duplicate.existing_id)}`, {
+          method: "DELETE",
+        });
+        closeDuplicateModal();
+        await refreshDocumentCount();
+        setUploadStatus("已用新上传版本覆盖库内版本", "ready");
+      } catch (error) {
+        setUploadStatus(`覆盖失败：${error.message}`, "error");
+        setDuplicateBusy(false);
+      }
+    }
+
+    function keepLibrary() {
+      const filename = state.duplicateContext?.duplicate?.existing_filename || "库内版本";
+      closeDuplicateModal();
+      setUploadStatus(`已保留库内版本：${filename}`, "ready");
+    }
+
+    function appendDiffLine(container, text) {
+      container.appendChild(createTextElement("li", "", text));
+    }
+
+    function renderComparison(compare) {
+      el.chapterDiff.replaceChildren();
+      const chapters = compare.chapters || {};
+      appendDiffLine(
+        el.chapterDiff,
+        `新增章节：${(chapters.added || []).join("、") || "无"}`
+      );
+      appendDiffLine(
+        el.chapterDiff,
+        `删除章节：${(chapters.removed || []).join("、") || "无"}`
+      );
+      appendDiffLine(
+        el.chapterDiff,
+        `改写章节：${(chapters.rewritten || []).map((item) => item.title).join("、") || "无"}`
+      );
+
+      const references = compare.references || {};
+      el.referenceSummary.textContent =
+        `参考文献：${references.old_count ?? "—"} → ${references.new_count ?? "—"}；` +
+        `删除 ${references.removed_count ?? 0} 条，新增 ${references.added_count ?? 0} 条`;
+      el.referenceDiff.replaceChildren();
+      for (const title of references.removed || []) {
+        appendDiffLine(el.referenceDiff, `删除：${title}`);
+      }
+      for (const title of references.added || []) {
+        appendDiffLine(el.referenceDiff, `新增：${title}`);
+      }
+      if (!el.referenceDiff.children.length) {
+        appendDiffLine(el.referenceDiff, "无条目变化");
+      }
+      el.compareSection.classList.remove("hidden");
+    }
+
+    async function compareVersions() {
+      const context = state.duplicateContext;
+      if (!context) return;
+      setDuplicateBusy(true);
+      setUploadStatus("正在生成版本差异", "busy");
+      let temporaryId = "";
+      try {
+        const result = await postUpload(context.file, true);
+        if (result?.status !== "ok") {
+          throw new Error(result?.reason || result?.message || "版本准备失败");
+        }
+        temporaryId = result.paper_id;
+        const compare = await fetchJson(
+          `/api/dedup/compare?id_new=${encodeURIComponent(temporaryId)}` +
+          `&id_old=${encodeURIComponent(context.duplicate.existing_id)}`,
+          { method: "POST" }
+        );
+        renderComparison(compare);
+        el.duplicateTitle.textContent = "版本差异";
+        el.duplicateActions.classList.add("hidden");
+        setUploadStatus("版本对比完成", "ready");
+      } catch (error) {
+        setUploadStatus(`对比失败：${error.message}`, "error");
+        setDuplicateBusy(false);
+      } finally {
+        if (temporaryId) {
+          try {
+            await fetchJson(`/api/papers/${encodeURIComponent(temporaryId)}`, {
+              method: "DELETE",
+            });
+          } catch (_) {}
+          await refreshDocumentCount();
+        }
+      }
+    }
+
+    async function uploadFile(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setUploadStatus("仅支持 PDF 文件", "error");
+        return;
+      }
+      setUploadStatus(`正在解析 ${file.name}`, "busy");
+      try {
+        const result = await postUpload(file, false);
+        if (!result) throw new Error("上传未返回结果");
+        if (result.status === "duplicate_warning") {
+          setUploadStatus("检测到同源版本，请选择保留方式", "busy");
+          openDuplicateModal(file, result);
+          return;
+        }
+        if (result.status !== "ok") {
+          throw new Error(result.reason || result.message || "上传失败");
+        }
+        setUploadStatus(`解析完成：${result.n_pages} 页 · ${result.authors?.length || 0} 位作者`, "ready");
+        await loadUploadedResult(result);
+        await refreshDocumentCount();
+      } catch (error) {
+        setUploadStatus(`上传失败：${error.message}`, "error");
+      }
+    }
+
+    function bindUpload() {
+      el.fileInput.addEventListener("change", () => {
+        uploadFile(el.fileInput.files?.[0]);
+        el.fileInput.value = "";
+      });
+      for (const eventName of ["dragenter", "dragover"]) {
+        el.dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          el.dropZone.classList.add("dragging");
+        });
+      }
+      for (const eventName of ["dragleave", "drop"]) {
+        el.dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          el.dropZone.classList.remove("dragging");
+        });
+      }
+      el.dropZone.addEventListener("drop", (event) => {
+        uploadFile(event.dataTransfer?.files?.[0]);
+      });
+      el.duplicateClose.addEventListener("click", closeDuplicateModal);
+      el.keepBtn.addEventListener("click", keepLibrary);
+      el.overwriteBtn.addEventListener("click", overwriteLibrary);
+      el.compareBtn.addEventListener("click", compareVersions);
+      el.duplicateModal.addEventListener("click", (event) => {
+        if (event.target === el.duplicateModal) closeDuplicateModal();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !el.duplicateModal.classList.contains("hidden")) {
+          closeDuplicateModal();
+        }
+      });
+    }
+
+    function bindPager() {
+      el.prevPage.addEventListener("click", () => {
+        state.lastBBox = null;
+        renderPage(state.currentPage - 1, null);
+      });
+      el.nextPage.addEventListener("click", () => {
+        state.lastBBox = null;
+        renderPage(state.currentPage + 1, null);
+      });
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (state.pdfDoc) renderPage(state.currentPage, state.lastBBox);
+        }, 160);
+      });
+    }
+
+    async function boot() {
+      bindUpload();
+      bindPager();
+      bindQa();
+      bindGraph();
+      try {
+        const payload = await fetchJson("/api/papers");
+        const papers = payload.papers || [];
+        el.documentCount.textContent = `${papers.length} 篇`;
+        setServiceReady("本地服务已连接");
+        const preferred = papers
+          .filter((paper) => paper.filename?.startsWith("1706.03762v7"))
+          .sort((a, b) => (b.author_details?.length || 0) - (a.author_details?.length || 0))[0]
+          || papers[0];
+        if (!preferred) {
+          el.pdfEmpty.textContent = "上传 PDF 后开始阅读";
+          return;
+        }
+        const paper = await fetchJson(`/api/papers/${encodeURIComponent(preferred.id)}/parse`);
+        applyPaper(paper);
+        setUploadStatus("已载入 1706.03762v7.pdf");
+        await loadPdf(paper.pdf_url);
+      } catch (error) {
+        el.serviceState.textContent = "本地服务不可用";
+        el.pdfEmpty.textContent = `连接失败：${error.message}`;
+        setUploadStatus(`连接失败：${error.message}`, "error");
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>
