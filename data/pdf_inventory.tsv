@@ -1,0 +1,40 @@
+file	pages	MB	scanned	title	arxiv
+1607.06450v1.pdf	14	0.58	False	Layer Normalization	
+1706.03762v1.pdf	15	2.03	False	Attention Is All You Need	
+1706.03762v1_img.pdf	15	4.46	True	1706.03762v1_img	
+1706.03762v7.pdf	15	2.11	False	Attention Is All You Need	
+1707.06347v2.pdf	12	2.79	False	Proximal Policy Optimization Algorithms	
+1910.02054v3.pdf	24	0.74	False	ZeRO: Memory Optimizations Toward Training Trillion	
+1910.10683v4.pdf	67	1.13	False	Exploring the Limits of Transfer Learning with a Unified	
+2001.08361v1.pdf	30	2.38	False	Scaling Laws for Neural Language Models	
+2002.04745v2.pdf	17	0.74	False	On Layer Normalization in the Transformer Architecture	
+2005.14165v4.pdf	75	6.45	False	Language Models are Few-Shot Learners	
+2010.11929v2.pdf	22	3.57	False	AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE	
+209_Emergent_Abilities_of_Larg.pdf	30	0.6	False	Emergent Abilities of Large Language Models	
+2101.03961v3.pdf	40	1.24	False	Switch Transformers: Scaling to Trillion Parameter Models	
+2103.00020v1.pdf	48	6.5	False	Learning Transferable Visual Models From Natural Language Supervision	
+2106.09685v2.pdf	26	1.53	False	LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS	
+2107.03374v2.pdf	35	1.8	False	Evaluating Large Language Models Trained on Code	
+2201.11903v6.pdf	43	0.85	False	Chain-of-Thought Prompting Elicits Reasoning	
+2203.02155v1.pdf	68	1.71	False	Training language models to follow instructions	
+2205.14135v2.pdf	34	2.51	False	FlashAttention: Fast and Memory-Eﬃcient Exact Attention	
+2206.07682v2.pdf	30	0.8	False	Emergent Abilities of Large Language Models	
+2210.02414v2.pdf	56	4.52	False	GLM-130B: AN OPEN BILINGUAL PRE-TRAINED MODEL	
+2211.05100v4.pdf	73	2.89	False	BLOOM: A 176B-Parameter Open-Access Multilingual	
+2212.04356v1.pdf	28	0.96	False	Robust Speech Recognition via Large-Scale Weak Supervision	
+2303.08774v6.pdf	100	5.0	False	GPT-4 Technical Report	
+2304.08485v2.pdf	25	5.63	False	Visual Instruction Tuning	
+2305.13048v2.pdf	30	1.52	False	RWKV: Reinventing RNNs for the Transformer Era	
+2305.14314v1.pdf	26	1.02	False	QLORA: Efficient Finetuning of Quantized LLMs	
+2305.18290v3.pdf	27	1.24	False	Direct Preference Optimization: Your Language Model is Secretly a Reward Model	
+2307.09288v2.pdf	77	13.03	False	Llama 2: Open Foundation and Fine-Tuned Chat Models	
+2310.06825v1.pdf	9	3.58	False	Mistral 7B	
+2406.14491v2.pdf	22	0.8	False	Instruction Pre-Training: Language Models are Supervised Multitask Learners	
+2407.21783v3.pdf	92	9.38	False	The Llama 3 Herd of Models	
+2412.15115v2.pdf	26	1.85	False	Qwen2.5 Technical Report	
+2412.19437v1.pdf	53	1.8	False	DeepSeek-V3 Technical Report	
+2501.12948v2.pdf	86	4.8	False	Reinforcement Learning	
+333078981_693988129081760_4712707815225756708_n.pdf	27	0.59	False	LLaMA: Open and Efficient Foundation Language Models	
+language_understanding_paper.pdf	12	0.52	False	Improving Language Understanding	
+N19-1423.pdf	16	0.75	False	BERT: Pre-training of Deep Bidirectional Transformers for	
+UnderstandingDeepLearning_02_09_26_C.pdf	541	21.31	False	Understanding Deep Learning	

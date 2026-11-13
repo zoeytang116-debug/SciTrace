@@ -1,0 +1,314 @@
+[
+ {
+  "file": "1607.06450v1.pdf",
+  "pages": 14,
+  "MB": 0.58,
+  "scanned": false,
+  "title": "Layer Normalization",
+  "arxiv": ""
+ },
+ {
+  "file": "1706.03762v1.pdf",
+  "pages": 15,
+  "MB": 2.03,
+  "scanned": false,
+  "title": "Attention Is All You Need",
+  "arxiv": ""
+ },
+ {
+  "file": "1706.03762v1_img.pdf",
+  "pages": 15,
+  "MB": 4.46,
+  "scanned": true,
+  "title": "1706.03762v1_img",
+  "arxiv": ""
+ },
+ {
+  "file": "1706.03762v7.pdf",
+  "pages": 15,
+  "MB": 2.11,
+  "scanned": false,
+  "title": "Attention Is All You Need",
+  "arxiv": ""
+ },
+ {
+  "file": "1707.06347v2.pdf",
+  "pages": 12,
+  "MB": 2.79,
+  "scanned": false,
+  "title": "Proximal Policy Optimization Algorithms",
+  "arxiv": ""
+ },
+ {
+  "file": "1910.02054v3.pdf",
+  "pages": 24,
+  "MB": 0.74,
+  "scanned": false,
+  "title": "ZeRO: Memory Optimizations Toward Training Trillion",
+  "arxiv": ""
+ },
+ {
+  "file": "1910.10683v4.pdf",
+  "pages": 67,
+  "MB": 1.13,
+  "scanned": false,
+  "title": "Exploring the Limits of Transfer Learning with a Unified",
+  "arxiv": ""
+ },
+ {
+  "file": "2001.08361v1.pdf",
+  "pages": 30,
+  "MB": 2.38,
+  "scanned": false,
+  "title": "Scaling Laws for Neural Language Models",
+  "arxiv": ""
+ },
+ {
+  "file": "2002.04745v2.pdf",
+  "pages": 17,
+  "MB": 0.74,
+  "scanned": false,
+  "title": "On Layer Normalization in the Transformer Architecture",
+  "arxiv": ""
+ },
+ {
+  "file": "2005.14165v4.pdf",
+  "pages": 75,
+  "MB": 6.45,
+  "scanned": false,
+  "title": "Language Models are Few-Shot Learners",
+  "arxiv": ""
+ },
+ {
+  "file": "2010.11929v2.pdf",
+  "pages": 22,
+  "MB": 3.57,
+  "scanned": false,
+  "title": "AN IMAGE IS WORTH 16X16 WORDS: TRANSFORMERS FOR IMAGE RECOGNITION AT SCALE",
+  "arxiv": ""
+ },
+ {
+  "file": "209_Emergent_Abilities_of_Larg.pdf",
+  "pages": 30,
+  "MB": 0.6,
+  "scanned": false,
+  "title": "Emergent Abilities of Large Language Models",
+  "arxiv": ""
+ },
+ {
+  "file": "2101.03961v3.pdf",
+  "pages": 40,
+  "MB": 1.24,
+  "scanned": false,
+  "title": "Switch Transformers: Scaling to Trillion Parameter Models",
+  "arxiv": ""
+ },
+ {
+  "file": "2103.00020v1.pdf",
+  "pages": 48,
+  "MB": 6.5,
+  "scanned": false,
+  "title": "Learning Transferable Visual Models From Natural Language Supervision",
+  "arxiv": ""
+ },
+ {
+  "file": "2106.09685v2.pdf",
+  "pages": 26,
+  "MB": 1.53,
+  "scanned": false,
+  "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+  "arxiv": ""
+ },
+ {
+  "file": "2107.03374v2.pdf",
+  "pages": 35,
+  "MB": 1.8,
+  "scanned": false,
+  "title": "Evaluating Large Language Models Trained on Code",
+  "arxiv": ""
+ },
+ {
+  "file": "2201.11903v6.pdf",
+  "pages": 43,
+  "MB": 0.85,
+  "scanned": false,
+  "title": "Chain-of-Thought Prompting Elicits Reasoning",
+  "arxiv": ""
+ },
+ {
+  "file": "2203.02155v1.pdf",
+  "pages": 68,
+  "MB": 1.71,
+  "scanned": false,
+  "title": "Training language models to follow instructions",
+  "arxiv": ""
+ },
+ {
+  "file": "2205.14135v2.pdf",
+  "pages": 34,
+  "MB": 2.51,
+  "scanned": false,
+  "title": "FlashAttention: Fast and Memory-Eﬃcient Exact Attention",
+  "arxiv": ""
+ },
+ {
+  "file": "2206.07682v2.pdf",
+  "pages": 30,
+  "MB": 0.8,
+  "scanned": false,
+  "title": "Emergent Abilities of Large Language Models",
+  "arxiv": ""
+ },
+ {
+  "file": "2210.02414v2.pdf",
+  "pages": 56,
+  "MB": 4.52,
+  "scanned": false,
+  "title": "GLM-130B: AN OPEN BILINGUAL PRE-TRAINED MODEL",
+  "arxiv": ""
+ },
+ {
+  "file": "2211.05100v4.pdf",
+  "pages": 73,
+  "MB": 2.89,
+  "scanned": false,
+  "title": "BLOOM: A 176B-Parameter Open-Access Multilingual",
+  "arxiv": ""
+ },
+ {
+  "file": "2212.04356v1.pdf",
+  "pages": 28,
+  "MB": 0.96,
+  "scanned": false,
+  "title": "Robust Speech Recognition via Large-Scale Weak Supervision",
+  "arxiv": ""
+ },
+ {
+  "file": "2303.08774v6.pdf",
+  "pages": 100,
+  "MB": 5.0,
+  "scanned": false,
+  "title": "GPT-4 Technical Report",
+  "arxiv": ""
+ },
+ {
+  "file": "2304.08485v2.pdf",
+  "pages": 25,
+  "MB": 5.63,
+  "scanned": false,
+  "title": "Visual Instruction Tuning",
+  "arxiv": ""
+ },
+ {
+  "file": "2305.13048v2.pdf",
+  "pages": 30,
+  "MB": 1.52,
+  "scanned": false,
+  "title": "RWKV: Reinventing RNNs for the Transformer Era",
+  "arxiv": ""
+ },
+ {
+  "file": "2305.14314v1.pdf",
+  "pages": 26,
+  "MB": 1.02,
+  "scanned": false,
+  "title": "QLORA: Efficient Finetuning of Quantized LLMs",
+  "arxiv": ""
+ },
+ {
+  "file": "2305.18290v3.pdf",
+  "pages": 27,
+  "MB": 1.24,
+  "scanned": false,
+  "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+  "arxiv": ""
+ },
+ {
+  "file": "2307.09288v2.pdf",
+  "pages": 77,
+  "MB": 13.03,
+  "scanned": false,
+  "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+  "arxiv": ""
+ },
+ {
+  "file": "2310.06825v1.pdf",
+  "pages": 9,
+  "MB": 3.58,
+  "scanned": false,
+  "title": "Mistral 7B",
+  "arxiv": ""
+ },
+ {
+  "file": "2406.14491v2.pdf",
+  "pages": 22,
+  "MB": 0.8,
+  "scanned": false,
+  "title": "Instruction Pre-Training: Language Models are Supervised Multitask Learners",
+  "arxiv": ""
+ },
+ {
+  "file": "2407.21783v3.pdf",
+  "pages": 92,
+  "MB": 9.38,
+  "scanned": false,
+  "title": "The Llama 3 Herd of Models",
+  "arxiv": ""
+ },
+ {
+  "file": "2412.15115v2.pdf",
+  "pages": 26,
+  "MB": 1.85,
+  "scanned": false,
+  "title": "Qwen2.5 Technical Report",
+  "arxiv": ""
+ },
+ {
+  "file": "2412.19437v1.pdf",
+  "pages": 53,
+  "MB": 1.8,
+  "scanned": false,
+  "title": "DeepSeek-V3 Technical Report",
+  "arxiv": ""
+ },
+ {
+  "file": "2501.12948v2.pdf",
+  "pages": 86,
+  "MB": 4.8,
+  "scanned": false,
+  "title": "Reinforcement Learning",
+  "arxiv": ""
+ },
+ {
+  "file": "333078981_693988129081760_4712707815225756708_n.pdf",
+  "pages": 27,
+  "MB": 0.59,
+  "scanned": false,
+  "title": "LLaMA: Open and Efficient Foundation Language Models",
+  "arxiv": ""
+ },
+ {
+  "file": "language_understanding_paper.pdf",
+  "pages": 12,
+  "MB": 0.52,
+  "scanned": false,
+  "title": "Improving Language Understanding",
+  "arxiv": ""
+ },
+ {
+  "file": "N19-1423.pdf",
+  "pages": 16,
+  "MB": 0.75,
+  "scanned": false,
+  "title": "BERT: Pre-training of Deep Bidirectional Transformers for",
+  "arxiv": ""
+ },
+ {
+  "file": "UnderstandingDeepLearning_02_09_26_C.pdf",
+  "pages": 541,
+  "MB": 21.31,
+  "scanned": false,
+  "title": "Understanding Deep Learning",
+  "arxiv": ""
+ }
+]
