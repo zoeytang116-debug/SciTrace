@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
-DATA_DIR = PROJECT_DIR / "data"
+# SCITRACE_DATA_DIR 用于把库、上传件、索引整体指向副本目录，验收时不污染正式库。
+DATA_DIR = Path(os.getenv("SCITRACE_DATA_DIR") or (PROJECT_DIR / "data")).expanduser()
 UPLOAD_DIR = DATA_DIR / "uploads"
 INDEX_DIR = DATA_DIR / "index"
 DATA_DIR.mkdir(parents=True, exist_ok=True)

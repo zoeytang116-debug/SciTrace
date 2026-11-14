@@ -440,6 +440,54 @@
     .upload-status.error { color: var(--danger); }
     .upload-status.busy { color: var(--amber); }
 
+    .arxiv-import {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .arxiv-import input {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .arxiv-import input:focus { outline: none; border-color: var(--teal); }
+
+    .arxiv-import button {
+      padding: 6px 12px;
+      border: 1px solid var(--teal);
+      border-radius: 7px;
+      background: transparent;
+      color: var(--teal);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .arxiv-import button:hover:not(:disabled) { background: var(--teal); color: #fff; }
+    .arxiv-import button:disabled { opacity: .55; cursor: wait; }
+
+    .arxiv-status {
+      min-height: 18px;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .arxiv-status.error { color: var(--danger); }
+    .arxiv-status.busy { color: var(--amber); }
+    .arxiv-status.ready { color: var(--teal); }
+
     .section {
       padding: 12px 0;
       border-top: 1px solid var(--line);
@@ -1261,6 +1309,12 @@
             <span>文献库</span>
             <span id="paperListCount">0 篇</span>
           </div>
+          <div class="arxiv-import">
+            <input id="arxivInput" type="text" placeholder="输入 arXiv 编号，如 1706.03762"
+                   autocomplete="off" spellcheck="false" aria-label="arXiv 编号" />
+            <button id="arxivImportBtn" type="button">导入</button>
+          </div>
+          <div class="arxiv-status" id="arxivStatus">按 arXiv 编号一键下载并入库</div>
           <div class="paper-list" id="paperList"></div>
         </section>
 
@@ -1527,6 +1581,9 @@
       dropZone: document.getElementById("dropZone"),
       fileInput: document.getElementById("fileInput"),
       uploadStatus: document.getElementById("uploadStatus"),
+      arxivInput: document.getElementById("arxivInput"),
+      arxivImportBtn: document.getElementById("arxivImportBtn"),
+      arxivStatus: document.getElementById("arxivStatus"),
       paperTitle: document.getElementById("paperTitle"),
       paperMeta: document.getElementById("paperMeta"),
       authorCount: document.getElementById("authorCount"),
@@ -1636,6 +1693,11 @@
     function setUploadStatus(text, kind = "") {
       el.uploadStatus.textContent = text;
       el.uploadStatus.className = `upload-status ${kind}`.trim();
+    }
+
+    function setArxivStatus(text, kind = "") {
+      el.arxivStatus.textContent = text;
+      el.arxivStatus.className = `arxiv-status ${kind}`.trim();
     }
 
     async function fetchJson(url, options) {
@@ -2686,6 +2748,52 @@
       }
     }
 
+    async function importArxivPaper() {
+      const raw = el.arxivInput.value.trim();
+      if (!raw) {
+        setArxivStatus("请先输入 arXiv 编号，如 1706.03762", "error");
+        el.arxivInput.focus();
+        return;
+      }
+      el.arxivImportBtn.disabled = true;
+      setArxivStatus(`正在下载 ${raw} 并解析入库`, "busy");
+      try {
+        const result = await fetchJson("/api/papers/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ arxiv_id: raw }),
+        });
+        if (result.duplicate) {
+          const score = Number.isFinite(result.dedup_score)
+            ? result.dedup_score.toFixed(2)
+            : "—";
+          const existing = result.existing_title || result.title || "库内已有文献";
+          setArxivStatus(`疑似与库内《${existing}》同源，相似度 ${score}，未重复入库`, "error");
+          return;
+        }
+        setArxivStatus(`已导入《${result.title}》，${result.n_pages} 页 ${result.n_chunks} 块`, "ready");
+        const paper = await fetchJson(`/api/papers/${encodeURIComponent(result.paper_id)}/parse`);
+        await refreshDocumentCount();
+        applyPaper(paper);
+        await loadPdf(paper.pdf_url);
+        el.arxivInput.value = "";
+      } catch (error) {
+        setArxivStatus(`导入失败：${error.message}`, "error");
+      } finally {
+        el.arxivImportBtn.disabled = false;
+      }
+    }
+
+    function bindArxivImport() {
+      el.arxivImportBtn.addEventListener("click", importArxivPaper);
+      el.arxivInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          importArxivPaper();
+        }
+      });
+    }
+
     function bindUpload() {
       el.fileInput.addEventListener("change", () => {
         uploadFile(el.fileInput.files?.[0]);
@@ -2740,6 +2848,7 @@
 
     async function boot() {
       bindUpload();
+      bindArxivImport();
       bindPager();
       bindQa();
       bindGraph();

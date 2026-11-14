@@ -14,7 +14,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import shutil
+import time
+import urllib.error
+import urllib.request
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,6 +45,15 @@ DEMO_FILENAME = "1706.03762v7.pdf"
 DEMO_ID = "demo-v7"
 DEMO_SOURCE = Path(__file__).resolve().parent.parent / "pdf" / DEMO_FILENAME
 SEED_DIR = Path(__file__).resolve().parent.parent / "data" / "seed"
+
+ARXIV_ID_PATTERN = re.compile(
+    r"^(?:\d{4}\.\d{4,5}|[a-z][a-z\-]*(?:\.[A-Za-z]{2})?/\d{7})(?:v\d+)?$"
+)
+ARXIV_PDF_URL = "https://arxiv.org/pdf/{arxiv_id}"
+# arXiv 拒绝无 User-Agent 的下载请求。
+ARXIV_USER_AGENT = "SciTrace/1.0 (arXiv importer; +https://github.com/zoeytang116-debug/SciTrace)"
+ARXIV_TIMEOUT_S = 30
+MAX_ARXIV_BYTES = 80 * 1024 * 1024
 
 
 def _restore_seed_data() -> None:
@@ -157,6 +170,10 @@ class VizRequest(BaseModel):
     intent: str = ""
 
 
+class ArxivImportRequest(BaseModel):
+    arxiv_id: str = Field(..., min_length=1)
+
+
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     papers = store.list_papers()
@@ -254,6 +271,111 @@ async def upload(files: list[UploadFile] = File(...), allow_duplicate: bool = Fa
 
 def uvf_name(name: str) -> str:
     return Path(name).name
+
+
+def _normalize_arxiv_id(raw: str) -> str:
+    """接受 1706.03762 / v7 / arXiv: 前缀 / abs 链接，统一取出裸编号。"""
+    value = (raw or "").strip()
+    if not value:
+        raise HTTPException(400, "arXiv 编号不能为空")
+    match = re.search(r"arxiv\.org/(?:abs|pdf)/([^\s?#]+)", value, re.IGNORECASE)
+    if match:
+        value = match.group(1)
+    value = re.sub(r"^arxiv:\s*", "", value.strip(), flags=re.IGNORECASE)
+    value = re.sub(r"\.pdf$", "", value.strip(), flags=re.IGNORECASE).strip().rstrip("/")
+    if not ARXIV_ID_PATTERN.match(value):
+        raise HTTPException(
+            400,
+            f"无法识别的 arXiv 编号「{raw.strip()}」，应形如 1706.03762、1706.03762v7 "
+            "或 https://arxiv.org/abs/1706.03762",
+        )
+    return value
+
+
+def _download_arxiv_pdf(arxiv_id: str) -> bytes:
+    request = urllib.request.Request(
+        ARXIV_PDF_URL.format(arxiv_id=arxiv_id),
+        headers={"User-Agent": ARXIV_USER_AGENT},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=ARXIV_TIMEOUT_S) as response:
+            content_type = response.headers.get("Content-Type", "")
+            data = response.read(MAX_ARXIV_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise HTTPException(400, f"arXiv 上找不到编号 {arxiv_id}（HTTP 404）") from exc
+        raise HTTPException(400, f"下载 arXiv PDF 失败：HTTP {exc.code} {exc.reason}") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise HTTPException(400, f"下载 arXiv PDF 失败：{reason}") from exc
+
+    if len(data) > MAX_ARXIV_BYTES:
+        raise HTTPException(400, "arXiv PDF 超过 80MB，已拒绝入库")
+    if not data.startswith(b"%PDF") and "pdf" not in content_type.lower():
+        raise HTTPException(
+            400,
+            f"下载内容不是 PDF（Content-Type: {content_type or '未知'}），"
+            "可能编号不存在或 arXiv 返回了错误页",
+        )
+    return data
+
+
+def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, Any]:
+    """复用上传链路：落盘 → 解析 → 去重判定 → 入库。"""
+    path = parsing.save_upload(f"{arxiv_id}.pdf", data)
+    paper_id = uuid.uuid4().hex[:12]
+    try:
+        parsed = parsing.parse_pdf(path, paper_id)
+    except Exception as exc:
+        path.unlink(missing_ok=True)
+        raise HTTPException(400, f"PDF 解析失败：{exc}") from exc
+
+    meta = parsed.meta
+    duplicates = dedup.find_duplicates(
+        meta["fingerprint"],
+        meta["shingles"],
+        exclude_id=paper_id,
+        title=meta.get("title", ""),
+        filename=meta.get("filename", ""),
+        chunks=parsed.chunks,
+        outline=parsed.outline,
+    )
+    if duplicates:
+        path.unlink(missing_ok=True)
+        top = duplicates[0]
+        return {
+            "paper_id": top["existing_id"],
+            "title": meta["title"],
+            "n_pages": meta["n_pages"],
+            "n_chunks": len(parsed.chunks),
+            "duplicate": True,
+            "dedup_score": round(float(top["similarity"]), 4),
+            "existing_id": top["existing_id"],
+            "existing_title": top.get("existing_title") or "",
+            "elapsed_s": round(time.perf_counter() - started, 2),
+        }
+
+    store.insert_paper(meta, parsed.chunks)
+    store.log_event(paper_id, "arxiv_import", f"{arxiv_id} · {len(parsed.chunks)} 切片")
+    INDEX.invalidate()
+    return {
+        "paper_id": paper_id,
+        "title": meta["title"],
+        "n_pages": meta["n_pages"],
+        "n_chunks": len(parsed.chunks),
+        "duplicate": False,
+        "dedup_score": None,
+        "elapsed_s": round(time.perf_counter() - started, 2),
+    }
+
+
+@app.post("/api/papers/import")
+async def import_arxiv_paper(req: ArxivImportRequest) -> dict[str, Any]:
+    """按 arXiv 编号下载 PDF 并走既有解析、去重、入库链路。"""
+    started = time.perf_counter()
+    arxiv_id = _normalize_arxiv_id(req.arxiv_id)
+    data = await asyncio.to_thread(_download_arxiv_pdf, arxiv_id)
+    return await asyncio.to_thread(_ingest_arxiv_pdf, arxiv_id, data, started)
 
 
 @app.get("/api/papers")
