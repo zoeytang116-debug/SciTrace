@@ -74,6 +74,7 @@ def build_citation_graph(paper_ids: list[str] | None = None, include_external: b
     all_papers = list_papers()
     title_candidates = _title_index(all_papers)
     inventory = _inventory_titles()
+    papers_by_id = {paper["id"]: paper for paper in all_papers}
 
     graph = nx.DiGraph()
     for p in papers:
@@ -91,6 +92,17 @@ def build_citation_graph(paper_ids: list[str] | None = None, include_external: b
         for ref in p.get("references", []):
             target = _match_reference(ref, source_year, title_candidates)
             if target and target != p["id"]:
+                target_paper = papers_by_id.get(target)
+                if target_paper is None:
+                    continue
+                if target not in graph:
+                    graph.add_node(
+                        target,
+                        label=_display_title(target_paper, inventory),
+                        kind="library",
+                        year=target_paper.get("year", ""),
+                        pages=target_paper["n_pages"],
+                    )
                 edges.add((p["id"], target, "library"))
                 graph.add_edge(p["id"], target)
             elif include_external:
@@ -119,13 +131,13 @@ def build_citation_graph(paper_ids: list[str] | None = None, include_external: b
         outdeg = graph.out_degree(node)
         rank = ranks.get(node, 0.0)
         role = "library"
-        if data["kind"] == "library":
+        if data.get("kind", "library") == "library":
             role = "seminal" if indeg >= 1 and rank > 0 else ("frontier" if outdeg > 0 else "isolated")
         nodes.append(
             {
                 "id": node,
                 "label": data.get("label", node),
-                "kind": data["kind"],
+                "kind": data.get("kind", "library"),
                 "role": role,
                 "year": data.get("year", ""),
                 "in_degree": indeg,
@@ -135,7 +147,7 @@ def build_citation_graph(paper_ids: list[str] | None = None, include_external: b
             }
         )
     nodes.sort(key=lambda n: (-n["pagerank"], -n["in_degree"]))
-    library_nodes = [node for node in nodes if node["kind"] == "library"]
+    library_nodes = [node for node in nodes if node.get("kind", "library") == "library"]
     top_seminal = library_nodes[:2]
     edge_papers = sorted(
         library_nodes,
@@ -144,7 +156,7 @@ def build_citation_graph(paper_ids: list[str] | None = None, include_external: b
     top_ids = {node["id"] for node in top_seminal}
     edge_ids = {node["id"] for node in edge_papers}
     for node in nodes:
-        if node["kind"] != "library":
+        if node.get("kind", "library") != "library":
             node["role"] = "external"
         elif node["id"] in top_ids:
             node["role"] = "seminal"
