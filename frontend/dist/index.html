@@ -2749,6 +2749,7 @@
     }
 
     async function importArxivPaper() {
+      if (el.arxivImportBtn.disabled) return;
       const raw = el.arxivInput.value.trim();
       if (!raw) {
         setArxivStatus("请先输入 arXiv 编号，如 1706.03762", "error");
@@ -2756,7 +2757,7 @@
         return;
       }
       el.arxivImportBtn.disabled = true;
-      setArxivStatus(`正在下载 ${raw} 并解析入库`, "busy");
+      setArxivStatus("正在拉取并解析 arXiv 文献，请稍候。", "busy");
       try {
         const result = await fetchJson("/api/papers/import", {
           method: "POST",
@@ -2775,10 +2776,14 @@
         const paper = await fetchJson(`/api/papers/${encodeURIComponent(result.paper_id)}/parse`);
         await refreshDocumentCount();
         applyPaper(paper);
+        const item = el.paperList.querySelector(
+          `.paper-list-item[data-paper-id="${result.paper_id}"]`
+        );
+        if (item) item.scrollIntoView({ block: "nearest", behavior: "smooth" });
         await loadPdf(paper.pdf_url);
         el.arxivInput.value = "";
       } catch (error) {
-        setArxivStatus(`导入失败：${error.message}`, "error");
+        setArxivStatus(error.message || "请求失败", "error");
       } finally {
         el.arxivImportBtn.disabled = false;
       }
