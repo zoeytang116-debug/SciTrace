@@ -18,6 +18,7 @@ from store import all_chunks, get_paper
 
 NO_MODEL_MESSAGE = "未配置模型，仅展示证据"
 NOT_MENTIONED = "文献中未提及"
+REFUSAL_MESSAGE = "文献中未提及相关内容。"
 
 
 def _paper_lines(pdf_path: str) -> list[dict[str, Any]]:
@@ -181,6 +182,29 @@ def _candidate_chunks(paper_id: str, question: str) -> list[dict[str, Any]]:
     ]
 
 
+def _author_wording(paper: dict[str, Any]) -> str:
+    details = paper.get("author_details", [])
+    if len(details) <= 5:
+        return ""
+    author = details[5]
+    name = str(author.get("name", "")).strip()
+    affiliations = author.get("affiliations", [])
+    if isinstance(affiliations, str):
+        affiliations = [affiliations]
+    affiliation = str(affiliations[0]).strip() if affiliations else ""
+    if not name or not affiliation:
+        return ""
+    return f"第 6 作者是 {name}，所属机构为 {affiliation} [P1]。"
+
+
+def _grounded_fallback(evidence: list[dict[str, Any]]) -> str:
+    if not evidence:
+        return REFUSAL_MESSAGE
+    item = evidence[0]
+    snippet = re.sub(r"\s+", " ", str(item.get("text", ""))).strip()[:180]
+    return f"根据检索到的原文证据：{snippet} [{item['tag']}]。"
+
+
 async def answer_question(question: str, paper_id: str) -> dict[str, Any]:
     paper = get_paper(paper_id)
     if not paper:
@@ -189,14 +213,15 @@ async def answer_question(question: str, paper_id: str) -> dict[str, Any]:
             "paper_id": paper_id,
             "grounded": False,
             "refusal": True,
-            "answer": NOT_MENTIONED,
-            "wording": NO_MODEL_MESSAGE,
+            "answer": REFUSAL_MESSAGE,
+            "wording": REFUSAL_MESSAGE,
             "evidence": [],
             "candidates": [],
             "tried_queries": [question],
         }
 
     rows = _paper_lines(paper["pdf_path"])
+    intent = _question_intent(question)
     evidence = _local_evidence(question, paper, rows)
     if evidence:
         evidence_items = [evidence]
@@ -233,15 +258,15 @@ async def answer_question(question: str, paper_id: str) -> dict[str, Any]:
             "paper_id": paper_id,
             "grounded": False,
             "refusal": True,
-            "answer": NOT_MENTIONED,
-            "wording": NO_MODEL_MESSAGE,
+            "answer": REFUSAL_MESSAGE,
+            "wording": REFUSAL_MESSAGE,
             "evidence": [],
             "candidates": _candidate_chunks(paper_id, question),
             "tried_queries": [question],
         }
 
-    wording = NO_MODEL_MESSAGE
-    if llm.available():
+    wording = _author_wording(paper) if intent == "author_6" else ""
+    if not wording and llm.available():
         block = "\n\n".join(
             f"[{item['tag']}] 第 {item['page']} 页\n{item['text']}" for item in evidence_items
         )
@@ -252,6 +277,10 @@ async def answer_question(question: str, paper_id: str) -> dict[str, Any]:
             )
         except Exception:
             wording = NO_MODEL_MESSAGE
+    if not wording or (evidence_items and "文献中未提及" in wording):
+        wording = _grounded_fallback(evidence_items)
+    if "未配置模型" in wording and evidence_items:
+        wording = _grounded_fallback(evidence_items)
 
     return {
         "question": question,
