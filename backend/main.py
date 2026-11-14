@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import json
 import logging
 import re
@@ -390,15 +391,49 @@ def _download_arxiv_pdf(arxiv_id: str, started: float) -> bytes:
     return data
 
 
-def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, Any]:
-    """复用上传链路：落盘 → 解析 → 去重判定 → 入库。"""
-    path = parsing.save_upload(f"{arxiv_id}.pdf", data)
-    paper_id = uuid.uuid4().hex[:12]
+def _release_exception_chain(error: BaseException) -> None:
+    """断开异常链对解析帧（可能持有打开的 PDF 句柄）的引用。"""
+    seen: set[int] = set()
+    stack: list[BaseException | None] = [error]
+    while stack:
+        current = stack.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        stack.extend((current.__context__, current.__cause__))
+        try:
+            current.__traceback__ = None
+        except (AttributeError, TypeError):
+            continue
+
+
+def _cleanup_upload_file(path: Path, error: BaseException | None = None) -> None:
+    """删除临时文件；Windows 上解析器可能短暂占用句柄，先释放再重试。"""
+    if error is not None:
+        _release_exception_chain(error)
+    for _ in range(60):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            gc.collect()
+            time.sleep(0.05)
+    logger.warning("临时文件清理失败：%s", path)
+
+
+def _validate_pdf_bytes(data: bytes, arxiv_id: str, paper_id: str, started: float) -> None:
+    """落盘前用内存流校验 PDF 是否可打开，损坏文件不产生任何临时文件。"""
+    import pymupdf as fitz
+
     try:
-        parsed = parsing.parse_pdf(path, paper_id)
-    except Exception as exc:
-        path.unlink(missing_ok=True)
-        detail = messages.PARSE_FAILED.format(error=exc)
+        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            if doc.page_count < 1:
+                raise ValueError("PDF 无可解析页面")
+        finally:
+            doc.close()
+    except Exception as exc:  # noqa: BLE001 - 损坏/加密/空页统一收敛为 400
+        detail = messages.PARSE_FAILED.format(error_type=type(exc).__name__)
         _log_arxiv(
             logging.WARNING,
             arxiv_id=arxiv_id,
@@ -406,8 +441,36 @@ def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, A
             elapsed_s=time.perf_counter() - started,
             duplicate=None,
             reason=detail,
+            error=str(exc),
         )
         raise HTTPException(400, detail) from exc
+
+
+def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, Any]:
+    """复用上传链路：校验 → 落盘 → 解析 → 去重判定 → 入库。"""
+    paper_id = uuid.uuid4().hex[:12]
+    _validate_pdf_bytes(data, arxiv_id, paper_id, started)
+    path = parsing.save_upload(f"{arxiv_id}.pdf", data)
+    parse_error: BaseException | None = None
+    parsed = None
+    try:
+        parsed = parsing.parse_pdf(path, paper_id)
+    except Exception as exc:  # noqa: BLE001 - 任何解析异常都收敛为 400
+        parse_error = exc
+    if parse_error is not None or parsed is None:
+        error = parse_error or RuntimeError("解析器未返回结果")
+        _cleanup_upload_file(path, error)
+        detail = messages.PARSE_FAILED.format(error_type=type(error).__name__)
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=arxiv_id,
+            paper_id=paper_id,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=detail,
+            error=str(error),
+        )
+        raise HTTPException(400, detail) from error
 
     meta = parsed.meta
     duplicates = dedup.find_duplicates(
@@ -420,7 +483,7 @@ def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, A
         outline=parsed.outline,
     )
     if duplicates:
-        path.unlink(missing_ok=True)
+        _cleanup_upload_file(path)
         top = duplicates[0]
         _log_arxiv(
             logging.INFO,

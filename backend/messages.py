@@ -21,4 +21,4 @@ NOT_PDF = (
     "可能编号不存在或 arXiv 返回了错误页"
 )
 UNKNOWN = "未知"
-PARSE_FAILED = "PDF 解析失败：{error}"
+PARSE_FAILED = "PDF 文件损坏或无法解析（{error_type}），已拒绝入库"
