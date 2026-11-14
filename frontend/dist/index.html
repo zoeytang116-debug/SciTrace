@@ -192,6 +192,172 @@
     .graph-rank-title { font-weight: 650; overflow-wrap: anywhere; }
     .graph-rank-meta { margin-top: 3px; color: var(--muted); }
 
+    .tools-page {
+      height: calc(100vh - 44px);
+      display: grid;
+      grid-template-columns: 176px minmax(0, 1fr);
+      overflow: hidden;
+      background: var(--canvas);
+    }
+
+    .tools-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 16px 12px;
+      border-right: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .tools-rail-title {
+      padding: 0 8px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+
+    .tool-tab {
+      width: 100%;
+      padding: 9px 10px;
+      border: 0;
+      border-left: 3px solid transparent;
+      border-radius: 0 4px 4px 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .tool-tab:hover { background: #f4f7f8; }
+    .tool-tab.active {
+      border-left-color: var(--teal);
+      background: var(--teal-soft);
+      color: var(--teal);
+      font-weight: 700;
+    }
+
+    .tools-main {
+      min-width: 0;
+      overflow: auto;
+      padding: 20px;
+    }
+
+    .tool-panel {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .tool-panel h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      line-height: 1.6;
+    }
+
+    .tool-panel p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .tool-field {
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .tool-field span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .tool-field textarea,
+    .tool-field input,
+    .tool-field select {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #c8d1d7;
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      line-height: 1.6;
+      outline: none;
+    }
+
+    .tool-field textarea:focus,
+    .tool-field input:focus,
+    .tool-field select:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 2px rgba(11, 109, 122, .12);
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .tool-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .tool-result {
+      min-height: 120px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .tool-status {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .tool-error { color: var(--danger); }
+
+    .tool-references {
+      margin: 10px 0 0;
+      padding-left: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .viz-image {
+      display: block;
+      width: min(100%, 760px);
+      height: auto;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .selection-translate {
+      position: fixed;
+      z-index: 1200;
+      padding: 7px 11px;
+      border: 1px solid var(--teal);
+      border-radius: 6px;
+      background: var(--teal);
+      color: #fff;
+      font-size: 12px;
+      box-shadow: 0 5px 18px rgba(11, 109, 122, .24);
+      cursor: pointer;
+    }
+
     .pane {
       min-width: 0;
       min-height: 0;
@@ -770,10 +936,36 @@
       box-shadow: 0 2px 16px rgba(25, 39, 31, .12);
     }
 
-    #pdfCanvas { display: block; }
+    #pdfCanvas { position: relative; z-index: 1; display: block; }
+
+    .pdf-text-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      overflow: hidden;
+      line-height: 1;
+      text-align: initial;
+      text-size-adjust: none;
+      forced-color-adjust: none;
+      transform-origin: 0 0;
+    }
+
+    .pdf-text-layer span,
+    .pdf-text-layer br {
+      position: absolute;
+      color: transparent;
+      white-space: pre;
+      cursor: text;
+      transform-origin: 0 0;
+    }
+
+    .pdf-text-layer ::selection {
+      background: rgba(11, 109, 122, .28);
+    }
 
     .bbox-highlight {
       position: absolute;
+      z-index: 3;
       pointer-events: none;
       display: none;
       border: 2px solid #d92d20;
@@ -1028,6 +1220,7 @@
     <nav class="app-nav" aria-label="主导航">
       <button class="active" id="readerNav" type="button">阅读</button>
       <button id="graphNav" type="button">图谱</button>
+      <button id="toolsNav" type="button">工具</button>
     </nav>
     <div class="service-state" id="serviceState">正在连接本地服务</div>
   </header>
@@ -1136,6 +1329,7 @@
         <div class="pdf-empty" id="pdfEmpty">PDF 阅读器准备中</div>
         <div class="page-shell hidden" id="pageShell">
           <canvas id="pdfCanvas"></canvas>
+          <div class="pdf-text-layer" id="pdfTextLayer"></div>
           <div class="bbox-highlight" id="bboxHighlight"></div>
         </div>
       </div>
@@ -1153,6 +1347,89 @@
       </div>
     </aside>
   </main>
+
+  <section class="tools-page hidden" id="toolsPage">
+    <aside class="tools-rail">
+      <div class="tools-rail-title">科研工具</div>
+      <button class="tool-tab active" type="button" data-tool="translate">翻译</button>
+      <button class="tool-tab" type="button" data-tool="survey">综述</button>
+      <button class="tool-tab" type="button" data-tool="write">写作</button>
+      <button class="tool-tab" type="button" data-tool="viz">可视化</button>
+    </aside>
+    <div class="tools-main">
+      <section class="tool-panel" id="translatePanel">
+        <h1>学术翻译</h1>
+        <p>粘贴英文段落，或回阅读器选中文字后点击“翻译这段”。</p>
+        <label class="tool-field">
+          <span>原文</span>
+          <textarea id="translateInput" rows="7" placeholder="输入需要翻译的段落"></textarea>
+        </label>
+        <div class="tool-grid">
+          <label class="tool-field">
+            <span>方向</span>
+            <select id="translateDirection">
+              <option value="en2zh" selected>英译中</option>
+              <option value="zh2en">中译英</option>
+            </select>
+          </label>
+          <label class="tool-field">
+            <span>语体</span>
+            <select id="translateStyle">
+              <option value="academic" selected>学术</option>
+              <option value="concise">简洁</option>
+            </select>
+          </label>
+        </div>
+        <div class="tool-actions">
+          <button class="qa-submit" id="translateRun" type="button">翻译</button>
+          <span class="tool-status" id="translateStatus">等待输入</span>
+        </div>
+        <pre class="tool-result" id="translateResult">尚无翻译结果</pre>
+      </section>
+
+      <section class="tool-panel hidden" id="surveyPanel">
+        <h1>自动综述</h1>
+        <p id="surveyScope">将基于当前选中的论文生成综述。</p>
+        <div class="tool-actions">
+          <button class="qa-submit" id="surveyRun" type="button">生成综述</button>
+          <span class="tool-status" id="surveyStatus">等待生成</span>
+        </div>
+        <pre class="tool-result" id="surveyResult">尚无综述结果</pre>
+      </section>
+
+      <section class="tool-panel hidden" id="writePanel">
+        <h1>写作框架</h1>
+        <p id="writeScope">References 仅允许来自当前文献库。</p>
+        <label class="tool-field">
+          <span>研究想法</span>
+          <textarea id="writeIdea" rows="5" placeholder="描述你的研究想法"></textarea>
+        </label>
+        <div class="tool-actions">
+          <button class="qa-submit" id="writeRun" type="button">生成框架</button>
+          <span class="tool-status" id="writeStatus">等待输入</span>
+        </div>
+        <pre class="tool-result" id="writeResult">尚无论文框架</pre>
+      </section>
+
+      <section class="tool-panel hidden" id="vizPanel">
+        <h1>数据可视化</h1>
+        <p>粘贴 CSV，生成图表与符合学术规范的图注。</p>
+        <label class="tool-field">
+          <span>CSV 数据</span>
+          <textarea id="vizCsv" rows="8" placeholder="epoch,accuracy&#10;1,0.62&#10;2,0.71"></textarea>
+        </label>
+        <label class="tool-field">
+          <span>图表意图</span>
+          <input id="vizIntent" type="text" placeholder="例如：训练准确率变化">
+        </label>
+        <div class="tool-actions">
+          <button class="qa-submit" id="vizRun" type="button">生成图表</button>
+          <span class="tool-status" id="vizStatus">等待 CSV</span>
+        </div>
+        <div class="tool-result" id="vizResult">尚无图表</div>
+      </section>
+    </div>
+  </section>
 
   <section class="graph-page hidden" id="graphPage">
     <div class="graph-stage">
@@ -1219,6 +1496,8 @@
     </section>
   </div>
 
+  <button class="selection-translate hidden" id="selectionTranslate" type="button">翻译这段</button>
+
   <script>
     const state = {
       paper: null,
@@ -1238,6 +1517,8 @@
       duplicateContext: null,
       graphNetwork: null,
       graphLoaded: false,
+      activeTool: "translate",
+      selectedText: "",
     };
 
     const el = {
@@ -1260,6 +1541,7 @@
       pdfEmpty: document.getElementById("pdfEmpty"),
       pageShell: document.getElementById("pageShell"),
       pdfCanvas: document.getElementById("pdfCanvas"),
+      pdfTextLayer: document.getElementById("pdfTextLayer"),
       bboxHighlight: document.getElementById("bboxHighlight"),
       pageNumber: document.getElementById("pageNumber"),
       prevPage: document.getElementById("prevPage"),
@@ -1280,6 +1562,34 @@
       workspace: document.querySelector(".workspace"),
       readerNav: document.getElementById("readerNav"),
       graphNav: document.getElementById("graphNav"),
+      toolsNav: document.getElementById("toolsNav"),
+      toolsPage: document.getElementById("toolsPage"),
+      toolTabs: document.querySelectorAll(".tool-tab"),
+      translatePanel: document.getElementById("translatePanel"),
+      surveyPanel: document.getElementById("surveyPanel"),
+      writePanel: document.getElementById("writePanel"),
+      vizPanel: document.getElementById("vizPanel"),
+      translateInput: document.getElementById("translateInput"),
+      translateDirection: document.getElementById("translateDirection"),
+      translateStyle: document.getElementById("translateStyle"),
+      translateRun: document.getElementById("translateRun"),
+      translateStatus: document.getElementById("translateStatus"),
+      translateResult: document.getElementById("translateResult"),
+      surveyScope: document.getElementById("surveyScope"),
+      surveyRun: document.getElementById("surveyRun"),
+      surveyStatus: document.getElementById("surveyStatus"),
+      surveyResult: document.getElementById("surveyResult"),
+      writeScope: document.getElementById("writeScope"),
+      writeIdea: document.getElementById("writeIdea"),
+      writeRun: document.getElementById("writeRun"),
+      writeStatus: document.getElementById("writeStatus"),
+      writeResult: document.getElementById("writeResult"),
+      vizCsv: document.getElementById("vizCsv"),
+      vizIntent: document.getElementById("vizIntent"),
+      vizRun: document.getElementById("vizRun"),
+      vizStatus: document.getElementById("vizStatus"),
+      vizResult: document.getElementById("vizResult"),
+      selectionTranslate: document.getElementById("selectionTranslate"),
       graphPage: document.getElementById("graphPage"),
       citationNetwork: document.getElementById("citationNetwork"),
       graphLoading: document.getElementById("graphLoading"),
@@ -1493,12 +1803,18 @@
 
     function setMainView(view) {
       const graphActive = view === "graph";
-      el.workspace.classList.toggle("hidden", graphActive);
+      const toolsActive = view === "tools";
+      el.workspace.classList.toggle("hidden", graphActive || toolsActive);
       el.graphPage.classList.toggle("hidden", !graphActive);
+      el.toolsPage.classList.toggle("hidden", !toolsActive);
       el.readerNav.classList.toggle("active", !graphActive);
       el.graphNav.classList.toggle("active", graphActive);
+      el.toolsNav.classList.toggle("active", toolsActive);
       if (graphActive) {
         loadGraph();
+      }
+      if (toolsActive) {
+        switchTool(state.activeTool);
       }
     }
 
@@ -1642,7 +1958,225 @@
     function bindGraph() {
       el.readerNav.addEventListener("click", () => setMainView("reader"));
       el.graphNav.addEventListener("click", () => setMainView("graph"));
+      el.toolsNav.addEventListener("click", () => setMainView("tools"));
       el.refreshGraph.addEventListener("click", () => loadGraph(true));
+    }
+
+    function currentPaperIds() {
+      return state.paper?.paper_id ? [state.paper.paper_id] : [];
+    }
+
+    function updateToolScopes() {
+      const scope = state.paper
+        ? `当前论文：${state.paper.title || state.paper.filename}`
+        : `全库：${state.papers.length} 篇`;
+      el.surveyScope.textContent = `将基于${scope}生成综述。`;
+      el.writeScope.textContent = `${scope}。References 仅允许来自当前文献库。`;
+    }
+
+    function switchTool(name) {
+      state.activeTool = name;
+      const panels = {
+        translate: el.translatePanel,
+        survey: el.surveyPanel,
+        write: el.writePanel,
+        viz: el.vizPanel,
+      };
+      for (const tab of el.toolTabs) {
+        tab.classList.toggle("active", tab.dataset.tool === name);
+      }
+      for (const [key, panel] of Object.entries(panels)) {
+        panel.classList.toggle("hidden", key !== name);
+      }
+      updateToolScopes();
+    }
+
+    function setToolStatus(target, text, error = false) {
+      target.textContent = text;
+      target.classList.toggle("tool-error", error);
+    }
+
+    async function runTranslation() {
+      const text = el.translateInput.value.trim();
+      if (!text) {
+        setToolStatus(el.translateStatus, "请输入要翻译的内容", true);
+        return;
+      }
+      el.translateRun.disabled = true;
+      setToolStatus(el.translateStatus, "翻译中…");
+      const started = performance.now();
+      try {
+        const result = await fetchJson("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            direction: el.translateDirection.value,
+            style: el.translateStyle.value,
+          }),
+        });
+        const lines = [result.translated || result.note || "无翻译结果"];
+        if (result.glossary?.length) {
+          lines.push("", "术语对照：");
+          result.glossary.forEach((item) => lines.push(`${item.src} → ${item.dst}`));
+        }
+        el.translateResult.textContent = lines.join("\n");
+        const seconds = ((performance.now() - started) / 1000).toFixed(2);
+        setToolStatus(el.translateStatus, `完成 · ${seconds} 秒${result.degraded ? " · 降级" : ""}`);
+      } catch (error) {
+        setToolStatus(el.translateStatus, `失败：${error.message}`, true);
+      } finally {
+        el.translateRun.disabled = false;
+      }
+    }
+
+    async function runSurvey() {
+      el.surveyRun.disabled = true;
+      setToolStatus(el.surveyStatus, "综述生成中…");
+      const started = performance.now();
+      try {
+        const result = await fetchJson("/api/survey", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paper_ids: currentPaperIds() }),
+        });
+        el.surveyResult.textContent = result.survey || "无综述正文";
+        const seconds = ((performance.now() - started) / 1000).toFixed(2);
+        setToolStatus(
+          el.surveyStatus,
+          `完成 · ${seconds} 秒 · ${result.degraded ? "降级" : "模型生成"}`
+        );
+      } catch (error) {
+        setToolStatus(el.surveyStatus, `失败：${error.message}`, true);
+      } finally {
+        el.surveyRun.disabled = false;
+      }
+    }
+
+    function renderFramework(result) {
+      const parts = [];
+      for (const [section, text] of Object.entries(result.framework || {})) {
+        if (text) parts.push(`${section}\n${text}`);
+      }
+      const references = result.references || [];
+      parts.push(
+        references.length
+          ? `References\n${references.map((item, index) => `${index + 1}. ${item.title} (${item.year || "年份未知"})`).join("\n")}`
+          : "References\n（无可引用库内文献）"
+      );
+      if (result.rejected_hallucinated_refs) {
+        parts.push(`已拒绝编造文献：${result.rejected_hallucinated_refs} 条`);
+      }
+      return parts.join("\n\n");
+    }
+
+    async function runWriting() {
+      const idea = el.writeIdea.value.trim();
+      if (!idea) {
+        setToolStatus(el.writeStatus, "请先填写研究想法", true);
+        return;
+      }
+      el.writeRun.disabled = true;
+      setToolStatus(el.writeStatus, "框架生成中…");
+      const started = performance.now();
+      try {
+        const result = await fetchJson("/api/write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idea, paper_ids: currentPaperIds() }),
+        });
+        el.writeResult.textContent = renderFramework(result);
+        const seconds = ((performance.now() - started) / 1000).toFixed(2);
+        setToolStatus(
+          el.writeStatus,
+          `完成 · ${seconds} 秒${result.degraded ? " · 降级" : ""}`
+        );
+      } catch (error) {
+        setToolStatus(el.writeStatus, `失败：${error.message}`, true);
+      } finally {
+        el.writeRun.disabled = false;
+      }
+    }
+
+    async function runVisualization() {
+      const csvText = el.vizCsv.value.trim();
+      if (!csvText) {
+        setToolStatus(el.vizStatus, "请先粘贴 CSV 数据", true);
+        return;
+      }
+      el.vizRun.disabled = true;
+      setToolStatus(el.vizStatus, "图表生成中…");
+      const started = performance.now();
+      try {
+        const result = await fetchJson("/api/viz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ csv_text: csvText, intent: el.vizIntent.value.trim() }),
+        });
+        el.vizResult.replaceChildren();
+        const image = document.createElement("img");
+        image.className = "viz-image";
+        image.alt = result.caption || "生成图表";
+        image.src = `data:image/png;base64,${result.image_b64}`;
+        el.vizResult.appendChild(image);
+        el.vizResult.appendChild(
+          createTextElement("p", "wording-text", result.caption || "无自动图注")
+        );
+        if (result.insight) {
+          el.vizResult.appendChild(createTextElement("p", "tool-status", `核心结论：${result.insight}`));
+        }
+        const seconds = ((performance.now() - started) / 1000).toFixed(2);
+        setToolStatus(el.vizStatus, `完成 · ${seconds} 秒 · ${result.n_rows ?? 0} 行`);
+      } catch (error) {
+        setToolStatus(el.vizStatus, `失败：${error.message}`, true);
+      } finally {
+        el.vizRun.disabled = false;
+      }
+    }
+
+    function hideSelectionTranslate() {
+      el.selectionTranslate.classList.add("hidden");
+    }
+
+    function showSelectionTranslate() {
+      const selection = window.getSelection();
+      const text = selection?.toString().replace(/\s+/g, " ").trim() || "";
+      if (text.length < 8 || !selection.rangeCount) {
+        hideSelectionTranslate();
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        hideSelectionTranslate();
+        return;
+      }
+      state.selectedText = text.slice(0, 4000);
+      el.selectionTranslate.style.left = `${Math.min(window.innerWidth - 110, Math.max(8, rect.left))}px`;
+      el.selectionTranslate.style.top = `${Math.max(8, rect.top - 38)}px`;
+      el.selectionTranslate.classList.remove("hidden");
+    }
+
+    async function translateSelection() {
+      if (!state.selectedText) return;
+      hideSelectionTranslate();
+      el.translateInput.value = state.selectedText;
+      setMainView("tools");
+      switchTool("translate");
+      await runTranslation();
+    }
+
+    function bindTools() {
+      for (const tab of el.toolTabs) {
+        tab.addEventListener("click", () => switchTool(tab.dataset.tool));
+      }
+      el.translateRun.addEventListener("click", runTranslation);
+      el.surveyRun.addEventListener("click", runSurvey);
+      el.writeRun.addEventListener("click", runWriting);
+      el.vizRun.addEventListener("click", runVisualization);
+      el.selectionTranslate.addEventListener("click", translateSelection);
+      document.addEventListener("mouseup", () => window.setTimeout(showSelectionTranslate, 0));
+      document.addEventListener("keyup", () => window.setTimeout(showSelectionTranslate, 0));
     }
 
     function collectAffiliations(authors) {
@@ -1790,6 +2324,7 @@
       renderAuthors(paper);
       renderOutline(paper);
       renderChapterTree(paper);
+      updateToolScopes();
     }
 
     function setActiveChapter(index) {
@@ -1858,6 +2393,42 @@
       }
     }
 
+    async function renderPdfTextLayer(page, viewport) {
+      const layer = el.pdfTextLayer;
+      layer.replaceChildren();
+      layer.style.width = `${viewport.width}px`;
+      layer.style.height = `${viewport.height}px`;
+      layer.style.setProperty("--scale-factor", String(viewport.scale));
+      try {
+        const textContent = await page.getTextContent();
+        if (window.pdfjsLib?.renderTextLayer) {
+          const task = window.pdfjsLib.renderTextLayer({
+            textContent,
+            textContentSource: textContent,
+            container: layer,
+            viewport,
+            textDivs: [],
+          });
+          await (task?.promise || task);
+          return;
+        }
+        for (const item of textContent.items || []) {
+          if (!item.str) continue;
+          const tx = window.pdfjsLib.Util.transform(viewport.transform, item.transform);
+          const fontSize = Math.hypot(tx[2], tx[3]);
+          const span = document.createElement("span");
+          span.textContent = item.str;
+          span.style.left = `${tx[4]}px`;
+          span.style.top = `${tx[5] - fontSize}px`;
+          span.style.fontSize = `${fontSize}px`;
+          span.style.transform = `scaleX(${Math.max(0.1, item.width * viewport.scale / Math.max(1, fontSize * item.str.length))})`;
+          layer.appendChild(span);
+        }
+      } catch (_) {
+        layer.replaceChildren();
+      }
+    }
+
     async function renderPage(pageNumber, bbox = null) {
       if (!state.pdfDoc) return;
       const safePage = Math.min(Math.max(1, Number(pageNumber) || 1), state.pageCount);
@@ -1881,6 +2452,8 @@
 
       const transform = dpr === 1 ? null : [dpr, 0, 0, dpr, 0, 0];
       await page.render({ canvasContext: context, viewport, transform }).promise;
+      if (token !== state.renderToken) return;
+      await renderPdfTextLayer(page, viewport);
       if (token !== state.renderToken) return;
 
       state.currentPage = safePage;
@@ -1972,6 +2545,7 @@
       const papers = payload.papers || [];
       el.documentCount.textContent = `${papers.length} 篇`;
       renderPaperList(papers);
+      updateToolScopes();
       state.graphLoaded = false;
     }
 
@@ -2166,6 +2740,7 @@
       bindPager();
       bindQa();
       bindGraph();
+      bindTools();
       try {
         const payload = await fetchJson("/api/papers");
         const papers = payload.papers || [];
