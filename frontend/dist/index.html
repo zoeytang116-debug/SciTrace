@@ -1869,7 +1869,7 @@
       el.workspace.classList.toggle("hidden", graphActive || toolsActive);
       el.graphPage.classList.toggle("hidden", !graphActive);
       el.toolsPage.classList.toggle("hidden", !toolsActive);
-      el.readerNav.classList.toggle("active", !graphActive);
+      el.readerNav.classList.toggle("active", !graphActive && !toolsActive);
       el.graphNav.classList.toggle("active", graphActive);
       el.toolsNav.classList.toggle("active", toolsActive);
       if (graphActive) {
