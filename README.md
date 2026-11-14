@@ -1,105 +1,135 @@
-# 科研助手 Agent —— SciTrace · 文溯
+# SciTrace · 文溯 —— 可溯源的科研助手 Agent
 
-每一句回答都能点回原文那一页、那一行，证据不足时明确拒答的科研助手。
+> **每一句回答都能点回原文那一页那一行。**
+>
+> 2026 传智杯 AI 大模型创新应用挑战赛 · 科研助手 Agent · B 组 · 个人参赛
 
-## 安装
+**在线体验**：https://www.modelscope.cn/studios/zoey11677/SciTrace
+**直接访问**：https://zoey11677-scitrace.ms.show
 
-1. 创建并激活虚拟环境：
+---
 
-   ```powershell
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1
-   ```
+## 这是什么
 
-2. 安装后端依赖：
+大模型读论文最严重的问题不是"答不准"，而是**答错了你无法察觉**。一句编造的引文就足以毁掉一段综述的可信度。
 
-   ```powershell
-   pip install -r requirements.txt
-   ```
+SciTrace 把"可验证"做成硬约束：
 
-3. 复制环境变量模板并填入自己的密钥：
+- 答案里每个结论都挂 `[Pn]` 锚点，点击跳到原 PDF 那一页，并按 bbox 画出原文矩形高亮
+- 参考文献只能从库内已有条目里挑，未命中即剔除，界面显示"已拒绝 N 条"
+- 检索不到证据就明确输出"文献中未提及"，同时列出已检索到的候选片段
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
+## 五个能跑通的能力
 
-## 启动
+| 能力 | 做法 | 实测 |
+|---|---|---|
+| PDF 细粒度解析 | 字号 + 编号正则双判据建标题树；作者按上标切分、脚注回填机构；参考文献按编号切段 | 39 份官方 PDF，平均 5.94 s/份；v7 一级 7 / 三级 15 / 参考文献 40；八作者三机构全对 |
+| 抗幻觉问答 | 本地证据检索 + LLM 只负责措辞；证据不足拒答 | 官方 9 题：9/9 有证据、6/9 完整答对带页码、3/9 正确拒答、0 崩溃，1.1–2.2 s |
+| 语义去重 | SimHash + MinHash + 标题相似三信号投票 | 正样本 0.8490 / 负样本最高 0.4091 / 阈值 0.63 / 负样本误判 0-30 |
+| 引用图谱 | 引用关系抽取 → PageRank → 基石/边缘论文 → 自动综述 | 20 节点 64 边，时间倒错 0；Layer Norm PageRank 0.179677 居首；Transformer 被引 9 排第 2 |
+| 阅读 / 翻译 / 写作 / 可视化 | 三栏阅读器、章节树跳转、引用双向跳转、学术体翻译、CSV 出图 | 翻译 1.4 s、写作 2.7 s、综述 4.0 s |
 
-```powershell
-$env:PORT = "7860"
-uvicorn main:app --app-dir backend --host 0.0.0.0 --port $env:PORT
+## 架构
+
+```
+浏览器（单文件前端，无构建）
+   │ HTTP/JSON
+   ▼
+FastAPI（backend/main.py）
+   ├─ parsing.py    PyMuPDF → 页码 + bbox + 标题树 + 作者机构 + 参考文献
+   ├─ store.py      SQLite（papers / chunks / edges）
+   ├─ retrieval.py  jieba 分词 + 关键词召回 + RRF 融合
+   ├─ local_qa.py   证据裁剪；不足则拒答
+   ├─ llm.py        DeepSeek（OpenAI 兼容）—— 只把证据写成自然语言
+   ├─ graph.py      networkx + PageRank
+   └─ dedup.py      SimHash / MinHash / 标题相似，三信号投票
+   │
+   ▼
+DeepSeek API（仅措辞，不参与事实判定）
 ```
 
-## 部署
+**关键设计：裁决与表达分离。** 页码、bbox、参考文献全部由本地代码给出，模型拿到的输入里没有第二个页码可选——从结构上消灭"幻觉页码"。
 
-目标平台：魔搭创空间（ModelScope Studios），Docker 类型，免费 CPU 基础实例（16GB 内存）。
+## 本地安装
 
-### 构建镜像
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt      # Windows: .venv\Scripts\pip.exe
+cp .env.example .env                           # 填入 DEEPSEEK_API_KEY
+.venv/bin/python -m uvicorn main:app --app-dir backend --host 0.0.0.0 --port 7860
+```
+
+打开 http://127.0.0.1:7860
+
+### 环境变量
+
+| 变量 | 含义 |
+|---|---|
+| `DEEPSEEK_API_KEY` | 措辞层密钥（线上走平台 Secrets，不写进仓库） |
+| `LLM_BASE_URL` | OpenAI 兼容端点，默认 `https://api.deepseek.com/v1` |
+| `LLM_MODEL` | 模型名，默认 `deepseek-chat` |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | 切块粒度，默认 820 / 160 |
+| `TOP_K` / `RRF_K` | 召回条数与 RRF 常数，默认 8 / 60 |
+| `DEDUP_THRESHOLD` | 去重阈值，实测夹定为 0.63 |
+
+不填 key 也能跑：`llm_enabled=false`，问答退回本地模板措辞（`degraded=true`），功能不中断。
+
+## Docker 部署
 
 ```bash
 docker build -t scitrace .
-docker run --rm -p 7860:7860 -e PORT=7860 scitrace
+docker run -p 7860:7860 -e DEEPSEEK_API_KEY=sk-xxx scitrace
 ```
 
-Dockerfile 基于 `python:3.13-slim`，安装 `requirements.txt` 中的固定版本，并复制：
+镜像基于 `python:3.13-slim`，非 root 用户运行，监听 `0.0.0.0:7860`；`.env` 不在镜像内（`.dockerignore` 已排除）。
 
-- `backend/`
-- `frontend/dist/`
-- `pdf/`
-- `data/`（含运行时数据库、上传文件和 seed 副本）
+**线上（魔搭创空间 / Docker 类型）的三个硬约束**：端口必须 `7860`；单文件超 10 MiB 必须走 Git LFS；`data/seed/` 在启动时自愈，绕过免费实例"重启丢数据"。
 
-工作目录为 `/home/user/app`，使用非 root 用户运行。容器固定监听 `0.0.0.0:7860`，不能改为平台占用的 `8080`。
+## 主要接口
 
-### 魔搭创空间
+| 端点 | 用途 |
+|---|---|
+| `GET /api/health` | 状态：`llm_enabled / papers / chunks / dedup_threshold` |
+| `POST /api/papers/upload` | 上传 PDF（含去重判定） |
+| `GET /api/papers` · `GET /api/papers/{id}` | 文献列表与详情（作者机构、章节树、参考文献） |
+| `GET /api/papers/{id}/page/{n}.png` | 渲染原页（bbox 高亮的底图） |
+| `POST /api/qa` | 多文问答，返回 `answer + citations(page, bbox, tag)` |
+| `POST /api/qa/evidence` | 单题完整证据链（`grounded / refusal / candidates / tried_queries`） |
+| `POST /api/compare` | 同源版本对比（章节级 + 参考文献条目级） |
+| `POST /api/dedup/compare` | 去重相似度明细（三信号分值） |
+| `POST /api/graph` · `POST /api/survey` | 引用图谱 PageRank / 自动综述 |
+| `POST /api/translate` | 学术体中英互译 + 术语对照 |
+| `POST /api/write` | idea → 写作框架（引用只取库内） |
+| `POST /api/viz` | CSV → 图表 + 英文 Caption |
 
-1. 创建 Docker 类型的公开创空间 `SciTrace`。
-2. 在平台 Secrets 中配置所需模型环境变量。
-3. 在本地设置推送所需环境变量后运行部署脚本。
-4. 创空间会按根目录 `Dockerfile` 构建并映射 `7860` 端口。
+## 实测数据
 
-创空间地址占位：
+- 测试语料：`pdf/` 39 份官方 PDF（含 1 份扫描件、1 份 541 页长文档），**不使用任何自造 PDF 作为验收证据**
+- 逐份指标：`docs/parse_metrics.tsv`
+- 修前/修后记录与官方 9 题明细：`docs/03-测试记录.md`
 
-```text
-https://www.modelscope.cn/studios/<用户名>/SciTrace
+## 目录
+
+```
+backend/          11 个 Python 模块（解析/存储/检索/问答/措辞/图谱/去重/接口）
+frontend/dist/    单文件前端（index.html，63.9 KB，无构建）
+data/seed/        启动自愈快照（library.db + 20 篇 PDF）
+docs/             测试记录与逐份指标
+pdf/              39 份官方测试数据
+Dockerfile · requirements.txt · .env.example
 ```
 
-推送前先做 dry-run：
+## 团队信息
 
-```powershell
-$env:MODELSCOPE_USERNAME = "<用户名>"
-$env:MODELSCOPE_STUDIO = "SciTrace"
-.\deploy_modelscope.ps1
-```
+- **唐丽晴**（单人参赛）· 山西科技学院 · 计算机科学与技术 · B 组
+- 项目角色：选题、规格与验收标准制定、文档与演示脚本、部署验收；代码实现由 AI 编程助手（Codex + DeepSeek）完成，AI 协同贡献说明见技术文档第 7 章
 
-确认文件数和体积后显式推送：
+## 数据与合规
 
-```powershell
-$env:MODELSCOPE_API_TOKEN = "<模型空间访问令牌>"
-.\deploy_modelscope.ps1 -Push
-```
+- 测试语料为公开论文（arXiv / ACL / ICLR 等），仅用于比赛评测
+- 密钥仅通过环境变量与平台 Secrets 注入，不进入仓库、镜像、截图
+- 界面所有指标均可由仓库脚本复跑
 
-脚本从环境变量读取 token，不会把 token 写入仓库或打印；但 dry-run 不读取 token。脚本排除 `.venv`、`.git`、`.archive`、`__pycache__`、`*.pyc`、`*.log`、`.env`，默认分支为 `master`，不执行 force push。
+## License
 
-可选环境变量：
-
-```text
-DEEPSEEK_API_KEY=
-LLM_API_KEY=
-LLM_BASE_URL=https://api.deepseek.com/v1
-LLM_MODEL=deepseek-chat
-LLM_VISION_MODEL=
-EMBEDDING_MODEL=
-```
-
-使用 DeepSeek 时，把 DeepSeek key 写入创空间 Secret `DEEPSEEK_API_KEY` 或 `LLM_API_KEY`（前者优先）。未配置时系统仍可运行本地解析、检索、证据问答、去重和图谱，但不会调用模型。
-
-### 免费层限制
-
-免费 CPU 创空间长期无访问时会自动休眠，再次访问需要冷启动。具体休眠时长、构建额度和存储额度以魔搭创空间当前政策为准。
-
-### 数据烘焙与启动自愈
-
-- `data/library.db` 与 `data/uploads/` 同时烘焙进镜像。
-- `data/seed/library.db` 与 `data/seed/uploads/` 是只读种子副本。
-- 服务启动时若运行目录中的 `data/library.db` 不存在，会从 `data/seed/library.db` 复制恢复，并补齐缺失的上传文件。
-- 创空间重启可能清空运行时磁盘；上述 seed 自愈会在启动时恢复 20 篇内置文献。
+Apache-2.0

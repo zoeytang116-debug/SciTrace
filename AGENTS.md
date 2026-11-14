@@ -6,15 +6,25 @@
 
 ## 现在做什么（Codex 从这一节开始，不用问）
 
-**当前任务：把部署目标从 Hugging Face 改为魔搭创空间，并完成推送准备。** 只做部署适配，不动业务逻辑。
+**当前任务（2026-11-14）：修综述子集建图崩溃。** 只做这一项，不动其它逻辑。
 
-1. `Dockerfile` 适配魔搭：`WORKDIR /home/user/app`（平台约定），其余保持（`python:3.13-slim`、非 root、`PORT` 默认 7860、`uvicorn --app-dir backend --host 0.0.0.0 --port ${PORT:-7860}`）。**禁止 `COPY . .`**，确认 `.env` 不在镜像内。
-2. 确认端口：必须 `0.0.0.0:7860`，不能是 8080（平台占用）。
-3. 写 `deploy_modelscope.ps1`（或等价脚本）：把项目推到创空间仓库，排除 `.venv`、`.git`、`.archive`、`__pycache__`、`*.pyc`、`*.log`、`.env`；推前打印"将上传的文件数与总体积"。远程地址形如 `https://oauth2:<TOKEN>@www.modelscope.cn/studios/<用户名>/SciTrace.git`，默认分支 `master`，禁止 force push。
-4. 本地再验一次（7860）：`GET /` 200、`GET /api/papers` 20 条、`POST /api/graph` 20 节点 64 边、删库重启后仍 20 条。
-5. 把 `README.md` 的"部署"一节改成魔搭口径（平台、端口 7860、Secrets 注入、重启丢数据 + seed 自愈、创空间地址占位）。
+现象：`POST /api/survey {"paper_ids":["5188570ee8b3","702c6c5f39b1","73a29bc2fc4a"]}` 返回 500 `KeyError: 'kind'`；`POST /api/survey {"paper_ids":[]}` 与 `POST /api/graph {}` 正常。
 
-**做完这五项就停。** 后面接：视频脚本 → 技术文档填数 → Gitee 提交。
+根因：`backend/graph.py` 第 95 行 `graph.add_edge(p["id"], target)` 里，`target` 是库里未被选中的论文，networkx 自动创建了**无属性节点**，第 122 行 `data["kind"]` 因此 KeyError。
+
+要求：
+1. `add_edge` 之前确认 `target` 已注册属性（`label`/`year`/`pages`/`kind="library"`），参照第 80–86 行写法，用 `all_papers` 的信息补注册。**不要只为消错加 `.get` 默认值**——空节点缺 label 会让前端把 ID 当标题显示。
+2. 第 122/128/138/147 行的 `data["kind"]`、`node["kind"]` 改为防御写法，作为第二道防线。
+3. 不得改动全库建图的排序与 PageRank 逻辑，避免破坏已验收的「20 节点 64 边、时间倒错 0」。
+
+验收（必须贴真实输出）：
+- a. `POST /api/survey`（上述 3 个 id）→ 200，`degraded=false`，`survey` 为正文
+- b. `POST /api/survey {"paper_ids":[]}` → 200，全库综述
+- c. `POST /api/graph {}` → 仍 20 节点 64 边（回归）
+- d. `POST /api/graph {"paper_ids":["5188570ee8b3"]}` → 200，节点数 >1、每个节点 label 非空
+- e. 提交一条 commit：`综述: 修复子集建图空节点崩溃 | survey 200, graph 20/64 回归不变`
+
+**做完就停。** 代码仓库已迁到 GitHub：`https://github.com/zoeytang116-debug/SciTrace`，分支 `main`，已推 8 条 commit；推送走 SSH（`git@github.com:...`，密钥已配好），不需要 token。
 
 ### 已经做完的（不要重做，别在回归验证时改坏）
 
@@ -37,19 +47,20 @@
 
 ## 部署方案（已定：走免费，18 号前不买服务器）
 
-> **2026-11-13 实测网络后改判**：本机 `huggingface.co` DNS 解析失败、`render.com` 与 `github.com` 连接超时，`modelscope.cn` 与 `gitee.com` 正常。故海外平台一律弃用。
+> **2026-11-13 实测网络后改判**：`huggingface.co` 两个独立工具均报 DNS 解析失败，`render.com` 超时 → 海外平台弃用。`github.com` 网页与 API 正常（HTTP 200，0.3–0.6 s），但 **HTTPS 推送通道会被网络重置**（`Connection was reset` / `Empty reply from server`）→ 推送改走 **SSH over 443**（`ssh.github.com:443`，已配置于 `~/.ssh/config`，密钥 `id_scitrace`）。`modelscope.cn` 正常。
 
 | 项 | 决定 |
 |---|---|
-| 代码仓库 | **Gitee**（`gitee.com` 可达；比赛原文允许 GitHub/Gitee 二选一） |
+| 代码仓库 | **GitHub** 公开仓库 `https://github.com/zoeytang116-debug/SciTrace`，分支 `main`；推送用 SSH（`git@github.com:...`），不用 token |
 | 部署平台 | **魔搭 ModelScope 创空间**，类型 **Docker**，CPU 资源免费 |
 | 端口 | 必须监听 `0.0.0.0:7860`（平台硬要求，禁 8080）——现有 Dockerfile 已是 7860 |
 | 前置条件 | 需绑定阿里云账号 + 实名认证，否则 Docker 构建被拒 |
 | 免费层限制 | 默认每次重启数据丢失；持久化目录 `/mnt/workspace`；免费配额有时长限制 |
 | 数据自愈 | `data/seed/` 快照 + 启动检查，重启后自动恢复 20 篇（比依赖 `/mnt/workspace` 更稳，创空间重建时持久目录也会丢） |
 | 密钥注入 | **镜像内不得包含 `.env`**（Dockerfile 不许 `COPY . .`）；用创空间 Secrets 注入 `LLM_API_KEY` |
-| 其他约束 | 默认分支 `master`，禁止 force push；单文件 >100MB 才需 Git LFS（本项目最大 21MB，不需要） |
-| 访问地址 | `https://modelscope.cn/studios/<用户名>/SciTrace` |
+| 其他约束 | 默认分支 `master`，禁止 force push；**单文件上限 10 MiB**（不是 100 MiB）——超限必须走 Git LFS，`.gitattributes` 已加 `*.pdf filter=lfs`，否则推送被 `[COMMIT_POLICY_CAPACITY_REJECTED]` 拒绝 |
+| 访问地址 | 平台页 `https://www.modelscope.cn/studios/zoey11677/SciTrace`；独立域名 `https://zoey11677-scitrace.ms.show` |
+| 现状（2026-11-14） | 已上线 `Running`：health `llm_enabled=true / papers=20 / chunks=2580`，公网问答 2.6 s 带 page+bbox |
 | 将来迁移 | Dockerfile 平台无关；买服务器后 `docker build` 原样搬 |
 
 ## 项目是什么
@@ -89,8 +100,12 @@
 - [x] 后端 P0 四条修复（解析结构 / 作者年份 / 参考文献标题 / 去重阈值）
 - [x] 前端三屏：阅读器 + 问答溯源 + 引用图谱（另含去重弹窗与版本对比）
 - [x] 20 篇真实文献入库，图谱 20 节点 64 边、错边 0
-- [ ] 公网部署（免费路线已定，见上节；待执行）
-- [ ] 演示级模块补齐：综述（需 key）/ 写作 / 翻译 / 检索推荐
-- [ ] 演示视频（5–8 分钟 1080p 普通话 MP4）
-- [ ] 技术文档（≤30 页 PDF，`技术文档-骨架.md` 里 `【待填】` 待补实测数）
-- [ ] 代码仓库：**Gitee** 公开仓库 + ≥15 条有意义 commit（当前本地 0 条 commit、无 remote，需从零建立）
+- [x] 代码仓库：**GitHub** 公开仓库 `zoeytang116-debug/SciTrace`，已推送并核对（2026-11-13 起）
+- [x] DeepSeek 接入：`.env` 已配 `DEEPSEEK_API_KEY`；问答措辞、翻译、写作、证据链四块实测 200
+- [x] 官方九题全量实测：9/9 有证据、6/9 完整答对带页码、3/9 按设计拒答、0 崩溃
+- [x] 综述子集建图崩溃已修（`3e998c8`），survey 200 / 全库图谱仍 20 节点 64 边
+- [x] **公网 Demo 已上线**：`zoey11677/SciTrace`（Docker 类型，免费 CPU）→ https://zoey11677-scitrace.ms.show
+- [x] 39 份逐份解析指标：`docs/parse_metrics.tsv`（总 231.6 s、平均 5.94 s）
+- [ ] 演示视频（5–8 分钟 1080p 普通话 MP4）—— 脚本待写
+- [ ] 技术文档 PDF（正文已成稿 `技术文档-正文.md`，待排版出 PDF）
+- [ ] 历史提交补到 ≥15 条（当前 9 条本地 + 部署仓库若干）
