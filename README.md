@@ -26,7 +26,7 @@ SciTrace 把"可验证"做成硬约束：
 | PDF 细粒度解析 | 字号 + 编号正则双判据建标题树；作者按上标切分、脚注回填机构；参考文献按编号切段 | 39 份官方 PDF，平均 5.94 s/份；v7 一级 7 / 三级 15 / 参考文献 40；八作者三机构全对 |
 | 抗幻觉问答 | 本地证据检索 + LLM 只负责措辞；证据不足拒答 | 官方 9 题：9/9 有证据、6/9 完整答对带页码、3/9 正确拒答、0 崩溃，1.1–2.2 s |
 | 语义去重 | SimHash + MinHash + 标题相似三信号投票 | 正样本 0.8490 / 负样本最高 0.4091 / 阈值 0.63 / 负样本误判 0-30 |
-| 引用图谱 | 引用关系抽取 → PageRank → 基石/边缘论文 → 自动综述 | 20 节点 64 边，时间倒错 0；Layer Norm PageRank 0.179677 居首；Transformer 被引 9 排第 2 |
+| 引用图谱 | 引用关系抽取 → PageRank → 基石/边缘论文 → 自动综述 | 21 节点 67 边，时间倒错 0；Layer Norm PageRank 0.179677 居首；Transformer 被引 9 排第 2 |
 | 阅读 / 翻译 / 写作 / 可视化 | 三栏阅读器、章节树跳转、引用双向跳转、学术体翻译、CSV 出图 | 翻译 1.4 s、写作 2.7 s、综述 4.0 s |
 
 ## 架构
@@ -113,7 +113,7 @@ docker run -p 7860:7860 -e DEEPSEEK_API_KEY=sk-xxx scitrace
 ```
 backend/          11 个 Python 模块（解析/存储/检索/问答/措辞/图谱/去重/接口）
 frontend/dist/    单文件前端（index.html，63.9 KB，无构建）
-data/seed/        启动自愈快照（library.db + 20 篇 PDF）
+data/seed/        启动自愈快照（library.db + 21 篇 PDF）
 docs/             测试记录与逐份指标
 pdf/              39 份官方测试数据
 Dockerfile · requirements.txt · .env.example
