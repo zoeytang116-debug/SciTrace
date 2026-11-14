@@ -10,13 +10,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/dist/vis-network.min.js"></script>
   <style>
     :root {
-      --ink: #17211b;
-      --muted: #667069;
-      --line: #d9ded9;
-      --paper: #fbfcfa;
-      --canvas: #e7ebe7;
-      --teal: #0f766e;
-      --teal-soft: #dff3ef;
+      --ink: #222;
+      --muted: #6b7683;
+      --line: #e3e8ec;
+      --paper: #fff;
+      --canvas: #f7f9fa;
+      --teal: #0b6d7a;
+      --teal-soft: #e7f4f6;
       --amber: #b55d19;
       --amber-soft: #fff1df;
       --danger: #a23b32;
@@ -29,8 +29,10 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
-      background: #f3f5f2;
+      background: var(--canvas);
       color: var(--ink);
+      font-size: 13px;
+      line-height: 1.6;
       font-family: Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
     }
 
@@ -38,13 +40,13 @@
     button { color: inherit; }
 
     .topbar {
-      height: 56px;
+      height: 44px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 18px;
+      padding: 0 16px;
       border-bottom: 1px solid var(--line);
-      background: rgba(251, 252, 250, 0.96);
+      background: #fff;
     }
 
     .brand {
@@ -55,7 +57,7 @@
     }
 
     .brand strong { font-size: 16px; letter-spacing: 0; }
-    .brand span { color: var(--muted); font-size: 12px; }
+    .brand span { display: none; }
 
     .service-state {
       display: flex;
@@ -104,25 +106,25 @@
     }
 
     .workspace {
-      height: calc(100vh - 56px);
+      height: calc(100vh - 44px);
       display: grid;
       grid-template-columns: 340px minmax(480px, 1fr) 300px;
       overflow: hidden;
     }
 
     .graph-page {
-      height: calc(100vh - 56px);
+      height: calc(100vh - 44px);
       display: grid;
       grid-template-columns: minmax(620px, 1fr) 340px;
       overflow: hidden;
-      background: #eef2ee;
+      background: var(--canvas);
     }
 
     .graph-stage {
       position: relative;
       min-width: 0;
       border-right: 1px solid var(--line);
-      background: #f7f9f6;
+      background: var(--canvas);
     }
 
     #citationNetwork {
@@ -150,7 +152,7 @@
     .graph-side-scroll {
       min-height: 0;
       overflow: auto;
-      padding: 14px;
+      padding: 16px;
     }
 
     .graph-metric-row {
@@ -166,7 +168,7 @@
     }
 
     .graph-metric b { display: block; font-size: 20px; }
-    .graph-metric span { color: var(--muted); font-size: 10px; }
+    .graph-metric span { color: var(--muted); font-size: 12px; line-height: 1.6; }
 
     .graph-ranking {
       display: grid;
@@ -178,8 +180,8 @@
       padding: 8px;
       border-left: 3px solid var(--teal);
       background: #f6f9f7;
-      font-size: 11px;
-      line-height: 1.45;
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .graph-rank-item.edge {
@@ -207,7 +209,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 0 14px;
+      padding: 0 16px;
       border-bottom: 1px solid var(--line);
       font-size: 12px;
       color: var(--muted);
@@ -224,7 +226,7 @@
     .pane-scroll {
       min-height: 0;
       overflow: auto;
-      padding: 14px;
+      padding: 16px;
     }
 
     .drop-zone {
@@ -254,17 +256,18 @@
       align-items: center;
       gap: 7px;
       font-size: 13px;
+      line-height: 1.6;
     }
 
     .drop-main svg { width: 24px; height: 24px; color: var(--teal); }
-    .drop-main small { color: var(--muted); font-size: 11px; }
+    .drop-main small { color: var(--muted); font-size: 12px; line-height: 1.6; }
 
     .upload-status {
       min-height: 20px;
       margin-top: 9px;
       color: var(--muted);
       font-size: 12px;
-      line-height: 1.45;
+      line-height: 1.6;
       overflow-wrap: anywhere;
     }
 
@@ -272,7 +275,7 @@
     .upload-status.busy { color: var(--amber); }
 
     .section {
-      padding: 14px 0;
+      padding: 12px 0;
       border-top: 1px solid var(--line);
     }
 
@@ -284,7 +287,7 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 9px;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
@@ -293,8 +296,8 @@
 
     .paper-title {
       margin: 0;
-      font-size: 18px;
-      line-height: 1.34;
+      font-size: 20px;
+      line-height: 1.6;
       font-weight: 700;
       letter-spacing: 0;
     }
@@ -302,34 +305,35 @@
     .paper-subtitle {
       margin-top: 6px;
       color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .metric-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 7px;
+      gap: 12px;
       margin-top: 12px;
     }
 
     .metric {
-      padding: 8px 9px;
+      padding: 10px;
       border: 1px solid var(--line);
       background: #fff;
     }
 
     .metric b {
       display: block;
-      font-size: 18px;
-      line-height: 1.1;
+      font-size: 20px;
+      line-height: 1.2;
     }
 
     .metric span {
       display: block;
       margin-top: 4px;
       color: var(--muted);
-      font-size: 10px;
+      font-size: 12px;
+      line-height: 1.6;
     }
 
     .affiliation-chips {
@@ -344,7 +348,61 @@
       border-radius: 999px;
       background: var(--teal-soft);
       color: #155e56;
-      font-size: 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .paper-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .paper-list-item {
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 10px 10px 12px;
+      border: 1px solid var(--line);
+      border-left: 3px solid transparent;
+      border-radius: 4px;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .paper-list-item:hover { border-color: #b9cbd0; }
+
+    .paper-list-item.active {
+      border-left-color: var(--teal);
+      background: #fff;
+    }
+
+    .paper-list-title {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1.6;
+    }
+
+    .paper-list-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .paper-list-badge {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--teal-soft);
+      color: var(--teal);
+      font-size: 12px;
+      line-height: 1.6;
       white-space: nowrap;
     }
 
@@ -357,28 +415,28 @@
     .author-row {
       display: grid;
       grid-template-columns: 19px minmax(0, 1fr);
-      gap: 7px;
-      padding: 7px 0;
+      gap: 12px;
+      padding: 10px 0;
       border-bottom: 1px solid #edf0ec;
     }
 
     .author-index {
       color: #8a938d;
-      font-size: 10px;
-      line-height: 1.55;
+      font-size: 12px;
+      line-height: 1.6;
       text-align: right;
     }
 
     .author-name {
-      font-size: 12px;
-      line-height: 1.35;
+      font-size: 14px;
+      line-height: 1.6;
       font-weight: 650;
       overflow-wrap: anywhere;
     }
 
     .author-line {
-      font-size: 12px;
-      line-height: 1.45;
+      font-size: 14px;
+      line-height: 1.6;
       font-weight: 600;
       overflow-wrap: anywhere;
     }
@@ -386,8 +444,8 @@
     .author-affiliation {
       margin-top: 2px;
       color: var(--muted);
-      font-size: 10px;
-      line-height: 1.35;
+      font-size: 12px;
+      line-height: 1.6;
     }
 
     .mini-list {
@@ -401,8 +459,8 @@
       gap: 7px;
       padding: 5px 0;
       border-bottom: 1px solid #edf0ec;
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .mini-page {
@@ -434,7 +492,7 @@
       border-radius: 3px;
       background: transparent;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 12px;
       cursor: pointer;
     }
 
@@ -446,7 +504,7 @@
 
     .qa-mode-label {
       color: var(--teal);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 650;
     }
 
@@ -467,7 +525,7 @@
 
     .page-number {
       color: var(--muted);
-      font-size: 12px;
+      font-size: 13px;
       font-variant-numeric: tabular-nums;
       min-width: 76px;
       text-align: center;
@@ -491,7 +549,7 @@
     }
 
     .qa-composer {
-      padding: 14px;
+      padding: 16px;
       border-bottom: 1px solid var(--line);
       background: #f7f9f6;
     }
@@ -500,7 +558,7 @@
       display: block;
       margin-bottom: 7px;
       color: var(--muted);
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 700;
       letter-spacing: .04em;
       text-transform: uppercase;
@@ -523,7 +581,7 @@
       border-radius: 5px;
       background: #fff;
       color: var(--ink);
-      line-height: 1.45;
+      line-height: 1.6;
       outline: none;
     }
 
@@ -542,7 +600,7 @@
       border-radius: 4px;
       background: var(--teal);
       color: #fff;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 650;
       cursor: pointer;
     }
@@ -555,13 +613,13 @@
       flex: 1;
       overflow: auto;
       padding: 16px;
-      background: #fff;
+      background: var(--canvas);
     }
 
     .qa-empty {
       padding: 32px 14px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 13px;
       line-height: 1.6;
       text-align: center;
     }
@@ -569,18 +627,21 @@
     .qa-question {
       margin-bottom: 14px;
       color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .qa-question strong { color: var(--ink); }
 
     .answer-layer {
-      padding: 12px 0;
-      border-top: 1px solid var(--line);
+      margin-bottom: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
     }
 
-    .answer-layer:first-of-type { border-top: 0; padding-top: 0; }
+    .answer-layer:first-of-type { margin-top: 0; }
 
     .layer-label {
       display: flex;
@@ -588,7 +649,7 @@
       gap: 7px;
       margin-bottom: 7px;
       color: var(--muted);
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 750;
       letter-spacing: .05em;
     }
@@ -603,8 +664,8 @@
     .wording-text {
       margin: 0;
       color: var(--ink);
-      font-size: 13px;
-      line-height: 1.65;
+      font-size: 14px;
+      line-height: 1.6;
     }
 
     .evidence-list {
@@ -613,6 +674,9 @@
     }
 
     .evidence-item {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
       border: 1px solid #cdd7cf;
       border-left: 3px solid var(--teal);
       background: #fbfcfa;
@@ -622,10 +686,9 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 9px;
-      border-bottom: 1px solid #e5eae5;
+      padding: 8px;
       color: var(--muted);
-      font-size: 10px;
+      font-size: 12px;
     }
 
     .evidence-anchor {
@@ -638,30 +701,43 @@
       cursor: pointer;
     }
 
-    .evidence-anchor:hover { background: #c8ebe5; }
+    .evidence-anchor:hover {
+      background: var(--teal);
+      color: #fff;
+    }
 
     .evidence-bbox {
       margin-left: auto;
       font-variant-numeric: tabular-nums;
     }
 
-    .evidence-text,
+    .evidence-text {
+      margin: 0;
+      padding: 8px 10px 8px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
     .candidate-text {
       margin: 0;
       padding: 9px;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
-      color: #26332b;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-      font-size: 11px;
-      line-height: 1.55;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .refusal {
-      padding: 10px 12px;
-      border-left: 3px solid var(--amber);
-      background: var(--amber-soft);
-      color: #7b3d12;
+      padding: 12px;
+      border: 1px solid #cfd6dc;
+      border-radius: 8px;
+      background: #f2f4f5;
+      color: var(--muted);
       font-size: 13px;
       font-weight: 700;
     }
@@ -681,7 +757,7 @@
       padding: 6px 8px;
       border-bottom: 1px solid var(--line);
       color: var(--muted);
-      font-size: 10px;
+      font-size: 12px;
     }
 
     .page-shell {
@@ -700,9 +776,9 @@
       position: absolute;
       pointer-events: none;
       display: none;
-      border: 2px solid #d97706;
-      background: rgba(245, 158, 11, .22);
-      box-shadow: 0 0 0 3px rgba(245, 158, 11, .10);
+      border: 2px solid #d92d20;
+      background: rgba(217, 45, 32, .16);
+      box-shadow: 0 0 0 3px rgba(217, 45, 32, .10);
     }
 
     .pdf-empty {
@@ -715,7 +791,7 @@
       text-align: center;
     }
 
-    .chapter-scroll { padding: 8px; }
+    .chapter-scroll { padding: 16px; }
     .chapter-tree { display: grid; gap: 1px; }
 
     .chapter-item {
@@ -736,19 +812,19 @@
     .chapter-item.active { background: var(--teal-soft); color: #0c5c55; }
     .chapter-item.level-1 { margin-top: 5px; font-weight: 700; }
     .chapter-item.level-2 { padding-left: 17px; font-weight: 600; }
-    .chapter-item.level-3 { padding-left: 28px; font-size: 11px; }
+    .chapter-item.level-3 { padding-left: 28px; font-size: 12px; }
 
     .chapter-page {
       color: #7d8780;
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 500;
-      line-height: 1.45;
+      line-height: 1.6;
       font-variant-numeric: tabular-nums;
     }
 
     .chapter-title {
       font-size: inherit;
-      line-height: 1.4;
+      line-height: 1.6;
       overflow-wrap: anywhere;
     }
 
@@ -806,8 +882,8 @@
       border-radius: 4px;
       background: #eef1ed;
       cursor: pointer;
-      font-size: 18px;
-      line-height: 1;
+      font-size: 16px;
+      line-height: 1.6;
     }
 
     .modal-body { padding: 15px 16px; }
@@ -835,7 +911,7 @@
 
     .signal-cell:first-child { border-left: 0; }
     .signal-cell b { display: block; font-size: 14px; }
-    .signal-cell span { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .signal-cell span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 
     .recommendation {
       margin-top: 11px;
@@ -844,7 +920,7 @@
       background: var(--amber-soft);
       color: #71380f;
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .modal-actions {
@@ -895,7 +971,7 @@
 
     .compare-block h4 {
       margin: 0 0 7px;
-      font-size: 11px;
+      font-size: 12px;
       color: var(--muted);
       letter-spacing: .03em;
     }
@@ -903,8 +979,8 @@
     .diff-list {
       margin: 0;
       padding-left: 18px;
-      font-size: 11px;
-      line-height: 1.55;
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .ref-summary {
@@ -912,7 +988,7 @@
       font-weight: 700;
     }
 
-    .ref-list { margin: 8px 0 0; padding-left: 18px; font-size: 11px; line-height: 1.55; }
+    .ref-list { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
 
     .hidden { display: none !important; }
 
@@ -989,6 +1065,14 @@
 
         <section class="section">
           <div class="section-title">
+            <span>文献库</span>
+            <span id="paperListCount">0 篇</span>
+          </div>
+          <div class="paper-list" id="paperList"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">
             <span>作者与机构</span>
           </div>
           <div class="affiliation-chips" id="affiliationChips"></div>
@@ -1039,12 +1123,12 @@
                 <path d="m22 2-7 20-4-9-9-4Z"></path>
                 <path d="M22 2 11 13"></path>
               </svg>
-              检索
+              <span id="qaSubmitText">检索</span>
             </button>
           </div>
         </form>
         <div class="qa-results" id="qaResults" aria-live="polite">
-          <div class="qa-empty">输入问题后，先检索证据，再生成措辞。</div>
+          <div class="qa-empty">还没有提问 —— 试试「第六作者是谁？」</div>
         </div>
       </div>
 
@@ -1138,6 +1222,7 @@
   <script>
     const state = {
       paper: null,
+      papers: [],
       pdfDoc: null,
       currentPage: 1,
       pageCount: 0,
@@ -1188,7 +1273,10 @@
       qaForm: document.getElementById("qaForm"),
       qaInput: document.getElementById("qaInput"),
       qaSubmit: document.getElementById("qaSubmit"),
+      qaSubmitText: document.getElementById("qaSubmitText"),
       qaResults: document.getElementById("qaResults"),
+      paperList: document.getElementById("paperList"),
+      paperListCount: document.getElementById("paperListCount"),
       workspace: document.querySelector(".workspace"),
       readerNav: document.getElementById("readerNav"),
       graphNav: document.getElementById("graphNav"),
@@ -1223,6 +1311,16 @@
     function setServiceReady(text) {
       el.serviceState.textContent = text;
       el.serviceState.classList.add("ready");
+    }
+
+    async function refreshHealthStatus() {
+      try {
+        const health = await fetchJson("/api/health");
+        setServiceReady(`在线 · ${health.papers} 篇 · ${health.chunks} 块`);
+      } catch (_) {
+        el.serviceState.textContent = "服务离线";
+        el.serviceState.classList.remove("ready");
+      }
     }
 
     function setUploadStatus(text, kind = "") {
@@ -1331,7 +1429,14 @@
             )
           );
           item.appendChild(head);
-          item.appendChild(createTextElement("pre", "evidence-text", evidence.text));
+          const excerpt = String(evidence.text || "").replace(/\s+/g, " ").trim();
+          item.appendChild(
+            createTextElement(
+              "pre",
+              "evidence-text",
+              `${excerpt.slice(0, 40)}${excerpt.length > 40 ? "…" : ""}`
+            )
+          );
           list.appendChild(item);
         });
         evidenceLayer.appendChild(list);
@@ -1349,6 +1454,7 @@
       }
       setCenterView("qa");
       el.qaSubmit.disabled = true;
+      el.qaSubmitText.textContent = "检索中…";
       renderQaEmpty("正在检索证据");
       try {
         const result = await fetchJson("/api/qa/evidence", {
@@ -1361,6 +1467,7 @@
         renderQaEmpty(`检索失败：${error.message}`);
       } finally {
         el.qaSubmit.disabled = false;
+        el.qaSubmitText.textContent = "检索";
       }
     }
 
@@ -1559,6 +1666,35 @@
       return node;
     }
 
+    function updatePaperSelection() {
+      for (const button of el.paperList.querySelectorAll(".paper-list-item")) {
+        const selected = button.dataset.paperId === state.paper?.paper_id;
+        button.classList.toggle("active", selected);
+        button.setAttribute("aria-current", selected ? "true" : "false");
+      }
+    }
+
+    function renderPaperList(papers) {
+      state.papers = papers || [];
+      el.paperListCount.textContent = `${state.papers.length} 篇`;
+      el.paperList.replaceChildren();
+      state.papers.forEach((paper) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "paper-list-item";
+        button.dataset.paperId = paper.id;
+        button.appendChild(createTextElement("span", "paper-list-title", paper.title || paper.filename));
+        const badges = document.createElement("span");
+        badges.className = "paper-list-badges";
+        badges.appendChild(createTextElement("span", "paper-list-badge", `${paper.n_pages}页`));
+        badges.appendChild(createTextElement("span", "paper-list-badge", paper.year || "年份未知"));
+        button.appendChild(badges);
+        button.addEventListener("click", () => openGraphPaper(paper.id));
+        el.paperList.appendChild(button);
+      });
+      updatePaperSelection();
+    }
+
     function renderAuthors(paper) {
       const authors = paper.authors || [];
       const affiliations = (paper.affiliations && paper.affiliations.length)
@@ -1640,12 +1776,13 @@
 
     function applyPaper(paper) {
       state.paper = paper;
+      updatePaperSelection();
       state.activeIndex = -1;
       state.pendingOutlineIndex = null;
       state.pendingEvidence = null;
       state.lastBBox = null;
       state.qaResult = null;
-      renderQaEmpty("输入问题后，先检索证据，再生成措辞。");
+      renderQaEmpty("还没有提问 —— 试试「第六作者是谁？」");
       setCenterView("reader");
       document.title = `${paper.title || "论文"} · SciTrace`;
       el.paperTitle.textContent = paper.title || paper.filename || "未命名论文";
@@ -1832,7 +1969,9 @@
 
     async function refreshDocumentCount() {
       const payload = await fetchJson("/api/papers");
-      el.documentCount.textContent = `${(payload.papers || []).length} 篇`;
+      const papers = payload.papers || [];
+      el.documentCount.textContent = `${papers.length} 篇`;
+      renderPaperList(papers);
       state.graphLoaded = false;
     }
 
@@ -2031,7 +2170,8 @@
         const payload = await fetchJson("/api/papers");
         const papers = payload.papers || [];
         el.documentCount.textContent = `${papers.length} 篇`;
-        setServiceReady("本地服务已连接");
+        renderPaperList(papers);
+        await refreshHealthStatus();
         const preferred = papers
           .filter((paper) => paper.filename?.startsWith("1706.03762v7"))
           .sort((a, b) => (b.author_details?.length || 0) - (a.author_details?.length || 0))[0]
