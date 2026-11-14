@@ -170,11 +170,15 @@ class StubHandler(BaseHTTPRequestHandler):
         return
 
     def _respond(self, status: int, body: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            # 超时用例里客户端先断开，桩继续写会抛 WinError 10053，属预期噪声
+            return
 
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler 约定
         name = self.path.rstrip("/").split("/")[-1]
