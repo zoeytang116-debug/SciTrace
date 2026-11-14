@@ -2316,7 +2316,10 @@
       state.pendingEvidence = null;
       state.lastBBox = null;
       state.qaResult = null;
-      renderQaEmpty("还没有提问 —— 试试「第六作者是谁？」");
+      if (el.qaInput) el.qaInput.value = "";
+      renderQaEmpty(
+        `已切换到《${paper.title || paper.filename || "当前论文"}》，还没有提问 —— 试试「第六作者是谁？」`
+      );
       setCenterView("reader");
       document.title = `${paper.title || "论文"} · SciTrace`;
       el.paperTitle.textContent = paper.title || paper.filename || "未命名论文";
