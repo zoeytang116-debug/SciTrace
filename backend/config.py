@@ -28,6 +28,12 @@ def _env(key: str, default: str = "") -> str:
     return os.getenv(key, default).strip()
 
 
+# arXiv 导入：下载超时、下载地址与体积上限均可通过环境变量覆盖（验收脚本用本地桩服务注入故障）。
+ARXIV_TIMEOUT_S = float(_env("ARXIV_TIMEOUT_S", "30"))
+ARXIV_PDF_BASE_URL = _env("ARXIV_PDF_BASE_URL", "https://arxiv.org/pdf").rstrip("/")
+ARXIV_MAX_BYTES = int(_env("ARXIV_MAX_BYTES", str(80 * 1024 * 1024)))
+
+
 @dataclass(frozen=True)
 class LLMConfig:
     """OpenAI 兼容协议的大模型配置，可切换 DeepSeek / 硅基流动 / OpenAI 等。"""

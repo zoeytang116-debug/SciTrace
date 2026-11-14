@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import shutil
 import time
@@ -35,9 +36,10 @@ import dedup
 import graph as graph_mod
 import llm
 import local_qa
+import messages
 import parsing
 import store
-from config import LLM, UPLOAD_DIR
+from config import ARXIV_MAX_BYTES, ARXIV_PDF_BASE_URL, ARXIV_TIMEOUT_S, LLM, UPLOAD_DIR
 from retrieval import INDEX
 
 
@@ -49,11 +51,16 @@ SEED_DIR = Path(__file__).resolve().parent.parent / "data" / "seed"
 ARXIV_ID_PATTERN = re.compile(
     r"^(?:\d{4}\.\d{4,5}|[a-z][a-z\-]*(?:\.[A-Za-z]{2})?/\d{7})(?:v\d+)?$"
 )
-ARXIV_PDF_URL = "https://arxiv.org/pdf/{arxiv_id}"
 # arXiv 拒绝无 User-Agent 的下载请求。
 ARXIV_USER_AGENT = "SciTrace/1.0 (arXiv importer; +https://github.com/zoeytang116-debug/SciTrace)"
-ARXIV_TIMEOUT_S = 30
-MAX_ARXIV_BYTES = 80 * 1024 * 1024
+
+logger = logging.getLogger("scitrace.arxiv")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _arxiv_handler = logging.StreamHandler()
+    _arxiv_handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(_arxiv_handler)
+    logger.propagate = False
 
 
 def _restore_seed_data() -> None:
@@ -277,46 +284,109 @@ def _normalize_arxiv_id(raw: str) -> str:
     """接受 1706.03762 / v7 / arXiv: 前缀 / abs 链接，统一取出裸编号。"""
     value = (raw or "").strip()
     if not value:
-        raise HTTPException(400, "arXiv 编号不能为空")
+        raise HTTPException(400, messages.EMPTY_ID)
     match = re.search(r"arxiv\.org/(?:abs|pdf)/([^\s?#]+)", value, re.IGNORECASE)
     if match:
         value = match.group(1)
     value = re.sub(r"^arxiv:\s*", "", value.strip(), flags=re.IGNORECASE)
     value = re.sub(r"\.pdf$", "", value.strip(), flags=re.IGNORECASE).strip().rstrip("/")
     if not ARXIV_ID_PATTERN.match(value):
-        raise HTTPException(
-            400,
-            f"无法识别的 arXiv 编号「{raw.strip()}」，应形如 1706.03762、1706.03762v7 "
-            "或 https://arxiv.org/abs/1706.03762",
-        )
+        raise HTTPException(400, messages.INVALID_ID.format(raw=raw.strip()))
     return value
 
 
-def _download_arxiv_pdf(arxiv_id: str) -> bytes:
-    request = urllib.request.Request(
-        ARXIV_PDF_URL.format(arxiv_id=arxiv_id),
-        headers={"User-Agent": ARXIV_USER_AGENT},
-    )
+def _log_arxiv(
+    level: int,
+    *,
+    arxiv_id: str,
+    paper_id: str | None,
+    elapsed_s: float,
+    duplicate: bool | None,
+    reason: str = "",
+    **extra: Any,
+) -> None:
+    """结构化日志：来源、编号、paper id、耗时、是否重复、失败原因。只写日志，不碰 events 表。"""
+    payload: dict[str, Any] = {
+        "event": "arxiv_import",
+        "source": "arxiv",
+        "arxiv_id": arxiv_id,
+        "paper_id": paper_id,
+        "elapsed_s": round(elapsed_s, 3),
+        "duplicate": duplicate,
+    }
+    if reason:
+        payload["reason"] = reason
+    payload.update(extra)
+    logger.log(level, json.dumps(payload, ensure_ascii=False))
+
+
+def _download_arxiv_pdf(arxiv_id: str, started: float) -> bytes:
+    url = f"{ARXIV_PDF_BASE_URL}/{arxiv_id}"
+    request = urllib.request.Request(url, headers={"User-Agent": ARXIV_USER_AGENT})
     try:
         with urllib.request.urlopen(request, timeout=ARXIV_TIMEOUT_S) as response:
             content_type = response.headers.get("Content-Type", "")
-            data = response.read(MAX_ARXIV_BYTES + 1)
+            data = response.read(ARXIV_MAX_BYTES + 1)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
-            raise HTTPException(400, f"arXiv 上找不到编号 {arxiv_id}（HTTP 404）") from exc
-        raise HTTPException(400, f"下载 arXiv PDF 失败：HTTP {exc.code} {exc.reason}") from exc
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        reason = getattr(exc, "reason", exc)
-        raise HTTPException(400, f"下载 arXiv PDF 失败：{reason}") from exc
-
-    if len(data) > MAX_ARXIV_BYTES:
-        raise HTTPException(400, "arXiv PDF 超过 80MB，已拒绝入库")
-    if not data.startswith(b"%PDF") and "pdf" not in content_type.lower():
-        raise HTTPException(
-            400,
-            f"下载内容不是 PDF（Content-Type: {content_type or '未知'}），"
-            "可能编号不存在或 arXiv 返回了错误页",
+            detail = messages.NOT_FOUND.format(arxiv_id=arxiv_id)
+        elif exc.code >= 500:
+            detail = messages.SERVER_ERROR.format(status=exc.code)
+        else:
+            detail = messages.HTTP_FAILED.format(status=exc.code, reason=exc.reason)
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=arxiv_id,
+            paper_id=None,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=detail,
         )
+        raise HTTPException(400, detail) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        inner = getattr(exc, "reason", exc)
+        is_timeout = (
+            isinstance(exc, TimeoutError)
+            or isinstance(inner, TimeoutError)
+            or "timed out" in str(inner).lower()
+        )
+        detail = (
+            messages.TIMEOUT.format(timeout=ARXIV_TIMEOUT_S)
+            if is_timeout
+            else messages.NETWORK_FAILED.format(reason=inner)
+        )
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=arxiv_id,
+            paper_id=None,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=detail,
+        )
+        raise HTTPException(400, detail) from exc
+
+    if len(data) > ARXIV_MAX_BYTES:
+        detail = messages.TOO_LARGE.format(max_mb=ARXIV_MAX_BYTES // (1024 * 1024))
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=arxiv_id,
+            paper_id=None,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=detail,
+        )
+        raise HTTPException(400, detail)
+    if not data.startswith(b"%PDF") and "pdf" not in content_type.lower():
+        detail = messages.NOT_PDF.format(content_type=content_type or messages.UNKNOWN)
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=arxiv_id,
+            paper_id=None,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=detail,
+        )
+        raise HTTPException(400, detail)
     return data
 
 
@@ -328,7 +398,16 @@ def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, A
         parsed = parsing.parse_pdf(path, paper_id)
     except Exception as exc:
         path.unlink(missing_ok=True)
-        raise HTTPException(400, f"PDF 解析失败：{exc}") from exc
+        detail = messages.PARSE_FAILED.format(error=exc)
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=arxiv_id,
+            paper_id=paper_id,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=detail,
+        )
+        raise HTTPException(400, detail) from exc
 
     meta = parsed.meta
     duplicates = dedup.find_duplicates(
@@ -343,6 +422,15 @@ def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, A
     if duplicates:
         path.unlink(missing_ok=True)
         top = duplicates[0]
+        _log_arxiv(
+            logging.INFO,
+            arxiv_id=arxiv_id,
+            paper_id=top["existing_id"],
+            elapsed_s=time.perf_counter() - started,
+            duplicate=True,
+            existing_id=top["existing_id"],
+            dedup_score=round(float(top["similarity"]), 4),
+        )
         return {
             "paper_id": top["existing_id"],
             "title": meta["title"],
@@ -358,6 +446,15 @@ def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, A
     store.insert_paper(meta, parsed.chunks)
     store.log_event(paper_id, "arxiv_import", f"{arxiv_id} · {len(parsed.chunks)} 切片")
     INDEX.invalidate()
+    _log_arxiv(
+        logging.INFO,
+        arxiv_id=arxiv_id,
+        paper_id=paper_id,
+        elapsed_s=time.perf_counter() - started,
+        duplicate=False,
+        n_pages=meta["n_pages"],
+        n_chunks=len(parsed.chunks),
+    )
     return {
         "paper_id": paper_id,
         "title": meta["title"],
@@ -371,10 +468,92 @@ def _ingest_arxiv_pdf(arxiv_id: str, data: bytes, started: float) -> dict[str, A
 
 @app.post("/api/papers/import")
 async def import_arxiv_paper(req: ArxivImportRequest) -> dict[str, Any]:
-    """按 arXiv 编号下载 PDF 并走既有解析、去重、入库链路。"""
+    """按 arXiv 编号下载论文 PDF，并复用上传链路完成解析、去重与入库。
+
+    ### 支持的 arxiv_id 写法（大小写不敏感）
+    - 裸编号：`1706.03762`
+    - 带版本号：`1706.03762v7`
+    - 带前缀：`arXiv:1706.03762`
+    - abs / pdf 链接：`https://arxiv.org/abs/1706.03762`、`https://arxiv.org/pdf/1706.03762v7`
+    - 旧式编号：`hep-th/9901001`（同时支持 `arXiv:` 前缀与 vN 后缀）
+
+    ### 入参
+    | 字段 | 类型 | 必填 | 说明 |
+    |---|---|---|---|
+    | `arxiv_id` | string | 是 | 上述任一写法，服务端统一归一化为裸编号 |
+
+    ### 返回字段（HTTP 200）
+    | 字段 | 类型 | 说明 |
+    |---|---|---|
+    | `paper_id` | string | 新入库论文 ID；命中重复时为库内已有论文 ID |
+    | `title` | string | 解析出的标题 |
+    | `n_pages` | int | 页数 |
+    | `n_chunks` | int | 切片数 |
+    | `duplicate` | bool | 是否被去重判定为同源（true 时不写库） |
+    | `dedup_score` | number \\| null | 同源相似度；未重复时为 null |
+    | `elapsed_s` | number | 从请求到返回的总耗时（秒） |
+    | `existing_id` / `existing_title` | string | 仅 duplicate=true 时返回，指向库内同源论文 |
+
+    ### 返回码与异常分支
+    | 状态码 | 触发条件 | detail |
+    |---|---|---|
+    | 200 | 成功入库；或命中同源仅返回 `duplicate=true` | — |
+    | 400 | 编号为空 / 格式非法（不发起下载） | 中文原因 |
+    | 400 | arXiv 返回 404 | `arXiv 上找不到编号 …（HTTP 404）` |
+    | 400 | arXiv 返回 5xx | `arXiv 服务暂时不可用（HTTP 5xx），请稍后重试` |
+    | 400 | 连接失败 / 读取超时（默认 30 s，`ARXIV_TIMEOUT_S` 可配） | 中文原因 |
+    | 400 | 返回内容非 PDF（Content-Type 与文件头均不是 PDF） | 中文原因 |
+    | 400 | PDF 损坏、解析失败 | `PDF 解析失败：…`；临时文件已删除 |
+    | 422 | 请求体缺少 `arxiv_id` | FastAPI 校验错误 |
+    | 500 | 未预期异常 | 全局异常处理器 |
+
+    所有 400 分支都不会写入论文、切片或图谱数据；已落盘的临时文件会删除。
+
+    ### curl 示例
+    ```bash
+    # 裸编号
+    curl -X POST http://127.0.0.1:7860/api/papers/import \\
+         -H "Content-Type: application/json" \\
+         -d '{"arxiv_id": "1706.03762"}'
+
+    # 带版本号 / arXiv: 前缀 / abs 链接
+    curl -X POST http://127.0.0.1:7860/api/papers/import \\
+         -H "Content-Type: application/json" \\
+         -d '{"arxiv_id": "1706.03762v7"}'
+    curl -X POST http://127.0.0.1:7860/api/papers/import \\
+         -H "Content-Type: application/json" \\
+         -d '{"arxiv_id": "arXiv:1706.03762"}'
+    curl -X POST http://127.0.0.1:7860/api/papers/import \\
+         -H "Content-Type: application/json" \\
+         -d '{"arxiv_id": "https://arxiv.org/abs/1706.03762"}'
+    ```
+
+    成功响应示例：
+    ```json
+    {"paper_id": "507990b1585e", "title": "Deep Residual Learning for Image Recognition",
+     "n_pages": 12, "n_chunks": 58, "duplicate": false, "dedup_score": null, "elapsed_s": 12.7}
+    ```
+    重复响应示例（HTTP 200，不写库）：
+    ```json
+    {"paper_id": "5188570ee8b3", "title": "Attention Is All You Need", "n_pages": 15,
+     "n_chunks": 41, "duplicate": true, "dedup_score": 1.0,
+     "existing_id": "5188570ee8b3", "existing_title": "Attention Is All You Need", "elapsed_s": 9.79}
+    ```
+    """
     started = time.perf_counter()
-    arxiv_id = _normalize_arxiv_id(req.arxiv_id)
-    data = await asyncio.to_thread(_download_arxiv_pdf, arxiv_id)
+    try:
+        arxiv_id = _normalize_arxiv_id(req.arxiv_id)
+    except HTTPException as exc:
+        _log_arxiv(
+            logging.WARNING,
+            arxiv_id=(req.arxiv_id or "").strip(),
+            paper_id=None,
+            elapsed_s=time.perf_counter() - started,
+            duplicate=None,
+            reason=str(exc.detail),
+        )
+        raise
+    data = await asyncio.to_thread(_download_arxiv_pdf, arxiv_id, started)
     return await asyncio.to_thread(_ingest_arxiv_pdf, arxiv_id, data, started)
 
 
